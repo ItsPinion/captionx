@@ -46,6 +46,17 @@ Result on the fixtures: **2,551 raw placements → 28 figure occurrences**
 (13 + 8 + 7 across chapters 1/5/12), visually spot-checked (cell diagrams,
 portraits, experiment setups all correct).
 
+**Phase 6 — PaddleOCR integration ✅ (`src/ocr/`)**
+
+Engine validated end-to-end on a raster-only page and on a real fixture page
+(94 regions, boxes correctly in PDF points, ~45 s init+page on CPU).
+`apply_ocr_when_needed` (pipeline.py) completes the §11 output contract:
+pages whose native text is unusable get OCR regions merged into
+`PageExtraction.text_regions` (each tagged `source`), and the page records
+`ocr_used=True` for later method labeling. Models are vendored
+(`models/official_models/`) so the engine runs offline;
+`setup.sh` bootstraps the whole environment in one command.
+
 **Phase 5 — OCR decision ✅ (`src/ocr/decision.py`)**
 
 Simple rule per §11 (“do not over-engineer”): a page gets OCR only when its
@@ -69,35 +80,20 @@ CAPTIONX_OCR_TEST=1 .venv/bin/python -m pytest tests/test_ocr_engine.py
 ## Setup
 
 ```bash
-cd extraction
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-
-# headless servers only (missing libGL.so.1) — see requirements.txt notes:
-.venv/bin/pip uninstall -y opencv-contrib-python
-.venv/bin/pip install --no-deps --force-reinstall opencv-contrib-python-headless==4.10.0.84 \
-  && .venv/bin/pip install --no-deps --force-reinstall opencv-contrib-python==4.10.0.84
+cd extraction && ./setup.sh
 ```
 
-### OCR models (PP-OCRv5 mobile)
+Creates `.venv`, installs the pinned stack (with the headless-OpenCV fix for
+servers without libGL), fetches the sample fixtures, and runs the test suite.
 
-PaddleOCR normally downloads models from Baidu BOS / HuggingFace / ModelScope.
-In network-restricted environments **pre-seed the PaddleX cache** instead —
-PaddleX uses `~/.paddlex/official_models/<model_name>/` as-is when the
-directory exists. Required layout:
+### OCR models (PP-OCRv5 mobile) — vendored, offline-ready
 
-```text
-~/.paddlex/official_models/
-├── PP-OCRv5_mobile_det/   inference.json · inference.pdiparams · inference.yml
-└── PP-OCRv5_mobile_rec/   inference.json · inference.pdiparams · inference.yml
-```
-
-The models are the official PaddleX packages (a public GitHub repo mirror works:
-fetch `backend/models/V5/PP-OCRv5_mobile_{det,rec}_infer/*` from
-`YaoFANGUK/video-subtitle-extractor` via the GitHub API and place them as above).
-
-Set `PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True` to skip the hoster connectivity
-probe (the pipeline code does this automatically).
+The official PaddleX model packages (det 4.7 MB + rec 16.5 MB) are **vendored**
+at `models/official_models/PP-OCRv5_mobile_{det,rec}/` and committed, so
+inference needs **no network**. `src/ocr/model_cache.py` points
+`PADDLE_PDX_CACHE_HOME` there (override by exporting your own) and skips the
+model-hoster connectivity probe. If the directory is ever deleted, regenerate
+it with `./fetch_models.sh`.
 
 ## Fixtures (sample chapters)
 

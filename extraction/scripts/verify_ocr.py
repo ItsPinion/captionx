@@ -21,12 +21,12 @@ import tempfile
 import time
 from pathlib import Path
 
-# The sandbox has no route to the Paddle model hosters (BOS/HF/ModelScope are
-# blocked). Models are pre-seeded into the PaddleX cache, so skip the
-# connectivity check to avoid long timeouts. Harmless on normal machines.
-os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
-
 import pymupdf  # noqa: E402
+
+from src.ocr.model_cache import configure_model_cache  # noqa: E402
+
+# Vendored model cache + skipped hoster probe (see src/ocr/model_cache.py).
+configure_model_cache()
 from paddleocr import PaddleOCR  # noqa: E402
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"

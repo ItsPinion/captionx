@@ -49,6 +49,9 @@ class PageExtraction:
     page: int  # 1-based
     figures: list[ExtractedFigure] = field(default_factory=list)
     text_regions: list[TextRegion] = field(default_factory=list)
+    #: True once OCR has been merged into `text_regions` (Phase 6); the
+    #: matching stage uses this to label methods (native_text vs ocr).
+    ocr_used: bool = False
 
 
 @dataclass
