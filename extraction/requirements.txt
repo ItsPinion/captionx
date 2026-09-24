@@ -1,0 +1,22 @@
+# CaptionX extraction engine — direct dependencies (Phase 2).
+# Install into a venv:  python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+#
+# Pinned to versions verified together on Python 3.11 (Linux x86_64, CPU-only):
+#   pymupdf 1.28.2 · pillow 12.3.0 · paddleocr 3.7.0 · paddlepaddle 3.3.1
+#
+# Notes:
+# - `paddlepaddle` is the CPU build. No GPU/CUDA needed.
+# - PaddleOCR 3.x sits on `paddlex`, which (since 3.x) does NOT auto-install its
+#   own runtime extras — the `ocr-core` extra is required to create OCR pipelines.
+# - On headless servers, the `opencv-contrib-python` that paddleocr/paddlex pull
+#   in fails to import (`libGL.so.1` missing). Fix: install both wheels so the
+#   dependency check by dist-name still passes while headless owns `import cv2`:
+#     pip uninstall -y opencv-contrib-python opencv-contrib-python-headless
+#     pip install --no-deps --force-reinstall opencv-contrib-python==4.10.0.84
+#     pip install --no-deps --force-reinstall opencv-contrib-python-headless==4.10.0.84
+#   (On a normal desktop with libGL present this is unnecessary.)
+pymupdf==1.28.2
+pillow==12.3.0
+paddleocr==3.7.0
+paddlepaddle==3.3.1
+paddlex[ocr-core]==3.7.2
