@@ -33,3 +33,6 @@ Thumbs.db
 *.log
 .idea/
 .vscode/
+
+# sample NCERT fixture PDFs (fetched via extraction/fixtures/download.sh)
+extraction/fixtures/*.pdf
