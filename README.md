@@ -1,5 +1,7 @@
 # CaptionX — NCERT Image–Caption Extraction Automation
 
+[![CI](https://github.com/ItsPinion/captionx/actions/workflows/ci.yml/badge.svg)](https://github.com/ItsPinion/captionx/actions/workflows/ci.yml)
+
 Automated extraction of images and their captions from Grade 9 NCERT PDFs,
 with a web dashboard, a global FIFO job queue, and structured JSON/CSV output.
 

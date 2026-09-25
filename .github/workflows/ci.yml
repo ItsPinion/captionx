@@ -1,0 +1,96 @@
+# CaptionX CI — runs the full Phase 1–20 test battery on every push/PR.
+#
+#   api        — Bun workspace: monorepo typecheck + API test suite (stub engine)
+#   extraction — Python 3.11: pinned engine battery + NCERT fixture pins + §47 CLI smoke
+#
+# The extraction install mirrors extraction/setup.sh exactly (pinned stack +
+# headless-OpenCV fix). Fixture PDFs are not committed; fixtures/download.sh
+# fetches them from the GitHub mirror, which gates the Phase-17 pin tests.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# Newest run wins; also dedupes push + pull_request for the same branch.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: Typecheck + API tests (Bun)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install workspace dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck (turbo, all workspaces)
+        run: bun run typecheck
+
+      - name: API tests (store, worker, routes)
+        run: bun test apps/api
+
+  extraction:
+    name: Extraction tests (Python 3.11)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: extraction
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            extraction/requirements.txt
+            extraction/requirements-dev.txt
+
+      - name: Install pinned stack (mirrors setup.sh)
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install --upgrade pip -q
+          .venv/bin/pip install -r requirements-dev.txt
+          # Headless OpenCV fix: paddlex/paddleocr depend on opencv-contrib-python
+          # by dist name; the headless wheel owns the actual cv2 import and is
+          # installed LAST on purpose.
+          .venv/bin/pip uninstall -y -q opencv-contrib-python opencv-contrib-python-headless || true
+          .venv/bin/pip install -q --no-deps --force-reinstall opencv-contrib-python==4.10.0.84
+          .venv/bin/pip install -q --no-deps --force-reinstall opencv-contrib-python-headless==4.10.0.84
+
+      - name: Fetch NCERT fixture PDFs (GitHub mirror)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./fixtures/download.sh
+
+      - name: Test battery (Phases 2–16 + fixture pins)
+        run: .venv/bin/python -m pytest tests -q
+
+      - name: "§47 milestone smoke — real CLI on ch05 (pin: 8 images / 6 matched / 2 not_found)"
+        run: |
+          .venv/bin/python main.py \
+            --job-id ci-ch05 \
+            --input fixtures/ncert_class9_science_ch05_cell.pdf \
+            --output /tmp/ci-ch05
+          .venv/bin/python - <<'PY'
+          import json
+
+          r = json.load(open("/tmp/ci-ch05/results.json"))
+          images = r["images"]
+          matched = sum(1 for i in images if i["status"] == "matched")
+          not_found = sum(1 for i in images if i["status"] == "caption_not_found")
+          assert len(images) == 8, f"expected 8 images, got {len(images)}"
+          assert matched == 6, f"expected 6 matched, got {matched}"
+          assert not_found == 2, f"expected 2 caption_not_found, got {not_found}"
+          print(f"§47 pin OK: 8 images, {matched} matched, {not_found} caption_not_found")
+          PY
