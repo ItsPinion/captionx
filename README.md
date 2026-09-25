@@ -7,7 +7,8 @@ structured `results.json` / `results.csv` output.
 [![CI](https://github.com/ItsPinion/captionx/actions/workflows/ci.yml/badge.svg)](https://github.com/ItsPinion/captionx/actions/workflows/ci.yml)
 
 > Phase-by-phase plan: [plan.md](./plan.md) · Engine details:
-> [extraction/README.md](./extraction/README.md)
+> [extraction/README.md](./extraction/README.md) · Assessment demo script:
+> [DEMO.md](./DEMO.md)
 
 ## 1. Problem statement
 
