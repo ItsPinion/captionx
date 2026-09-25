@@ -22,11 +22,12 @@ from typing import Optional
 
 import numpy as np
 
-# The sandbox (and some air-gapped deployments) cannot reach the Paddle model
-# hosters. Models pre-seeded in the PaddleX cache work without this check.
-os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
-
 import pymupdf
+
+from .model_cache import configure_model_cache
+
+# Vendored model cache + skipped hoster probe (see model_cache.py).
+configure_model_cache()
 
 from src.models import BBox, TextRegion, TextSource
 
