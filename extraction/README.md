@@ -185,11 +185,30 @@ GitHub mirror as fallback for sandboxed networks.
     --input fixtures/ncert_class9_science_ch05_cell.pdf --page 3
 ```
 
-## Engine invocation (contract, implemented in later phases)
+## Engine invocation — the §47 working milestone ✅ (Phases 13–16)
 
 ```bash
-python main.py --job-id <id> --input <pdf-path> --output <result-path>
+.venv/bin/python main.py \
+    --job-id test-001 \
+    --input fixtures/ncert_class9_science_ch05_cell.pdf \
+    --output /tmp/results/sample
+# → /tmp/results/sample/results.json · results.csv · images/*.png
 ```
+
+Optional flags: `--status <status.json>` (§30 stage progress: input →
+pdf_parse → image_extraction → ocr → matching → output, atomic writes,
+`completed`/`failed` + stage + message), `--source upload|url`,
+`--filename <display name>`. Exit 0 on success, 1 on pipeline failure
+(status records the failing stage), 2 on bad arguments.
+
+- Phase 12 (§18 no dedup): satisfied by construction — every occurrence is a
+  separate record; pinned by tests.
+- Phase 13 (§19): `results.json` — `document` + `images[]` with
+  image/page/caption/confidence/status/method, exact caption text.
+- Phase 14 (§20): `results.csv` — 6 columns, proper quoting (commas, quotes,
+  embedded newlines preserved).
+- Phase 15 (§21): CLI contract above — this is what the Hono API executes.
+- Phase 16 (§22): layout `<output>/{results.json,results.csv,images/}`.
 
 ## Known characteristics of the target NCERT PDFs
 
