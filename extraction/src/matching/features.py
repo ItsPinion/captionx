@@ -74,10 +74,13 @@ _SUBLABEL_RE = re.compile(r"^\s*\([a-z0-9ivx]{1,4}\)\s*:?\s*$", re.IGNORECASE)
 class FeatureConfig:
     """Tuning knobs for the §14 features (shared with §15 weighting)."""
 
-    #: Below-window used for proximity decay (mirrors CandidateConfig).
+    #: Below-window used for proximity decay (mirrors
+    #: CandidateConfig.max_below_gap_pt).
     below_window_pt: float = 100.0
-    #: Above-window used for proximity decay (mirrors CandidateConfig).
-    above_window_pt: float = 150.0
+    #: Above-window used for proximity decay (mirrors
+    #: CandidateConfig.max_above_gap_pt — tightened §33; the fallback
+    #: config overrides this from FALLBACK_CANDIDATE_CONFIG).
+    above_window_pt: float = 60.0
     #: x-center delta that maps alignment to 0.
     align_max_delta_pt: float = 150.0
     #: §14.4 position scores.

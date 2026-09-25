@@ -47,10 +47,13 @@ class TestProximity:
         f = feats(IMG, BBox(110, 500, 290, 512), "distant text")  # gap 100
         assert close(f["proximity"], 0.0)
 
-    def test_above_uses_larger_window(self):
-        # gap 100 above → (1 - 100/150); same gap below → 0
-        above = feats(IMG, BBox(110, -12, 290, 0), "above text")
-        assert close(above["proximity"], 1 - 100 / 150)
+    def test_above_window_decay(self):
+        """§33: the above-window is now 60 pt (was 150). Gap 50 above →
+        (1 - 50/60); gap 100 above is outside the window entirely → 0."""
+        above = feats(IMG, BBox(110, 38, 290, 50), "above text")  # gap = 100-50
+        assert close(above["proximity"], 1 - 50 / 60)
+        far_above = feats(IMG, BBox(110, -12, 290, 0), "far above text")  # gap 100
+        assert close(far_above["proximity"], 0.0)
 
 
 class TestAlignment:

@@ -120,6 +120,13 @@ Jobs live in `data/jobs/<id>/job.json`; engine output in
 - Pins: ch01 14/11 · ch05 8/6 · ch12 9/7 · 247 extraction + 22 API + 15 web
   tests.
 
+**Phase 34 — Edge-case checklist** ✅
+
+All 12 §40 cases deliberately inspected and pinned — matrix with evidence in
+[extraction/EDGE_CASES.md](./extraction/EDGE_CASES.md). The real-OCR engine
+path was re-run for the checklist (Case 10). Proximity feature window aligned
+with the §33-corrected candidate windows.
+
 ## Testing & CI
 
 All suites run locally the same way CI runs them (`.github/workflows/ci.yml`,
