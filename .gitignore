@@ -1,0 +1,35 @@
+# dependencies
+node_modules/
+
+# build outputs / caches
+.next/
+out/
+dist/
+.turbo/
+*.tsbuildinfo
+
+# environments
+.env
+.env.*
+!.env.example
+
+# runtime data — never commit generated data (plan.md §5)
+data/uploads/*
+data/jobs/*
+data/results/*
+!data/uploads/.gitkeep
+!data/jobs/.gitkeep
+!data/results/.gitkeep
+
+# python (Phase 2+)
+extraction/.venv/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# os / editor
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/
