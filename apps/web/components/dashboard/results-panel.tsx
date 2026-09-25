@@ -44,8 +44,14 @@ import {
   downloadSelectedAsZip,
   imageUrl,
 } from "@/lib/downloads";
+import {
+  NO_CAPTION_MESSAGE,
+  jobFailureDetail,
+  jobFailureTitle,
+} from "@/lib/errors";
 import { useJob, useJobResult } from "@/lib/hooks";
 import type { ImageResult } from "@captionx/shared";
+import { XCircle } from "lucide-react";
 
 /**
  * §26 results table + §27 selection + §28/§29 downloads for one completed
@@ -85,7 +91,15 @@ export function ResultsPanel({ jobId }: { jobId: string | null }) {
           </div>
         )}
         {jobId && status === "failed" && (
-          <EmptyState text={`This job failed: ${job.data?.error ?? "unknown error"}`} />
+          <div className="flex flex-col items-center gap-1.5 py-10 text-center">
+            <XCircle className="text-destructive size-6" />
+            <p className="text-sm font-medium">{jobFailureTitle()}</p>
+            {jobFailureDetail(job.data?.error) && (
+              <p className="text-muted-foreground max-w-md text-xs">
+                {jobFailureDetail(job.data?.error)}
+              </p>
+            )}
+          </div>
         )}
         {status === "completed" &&
           (result.isLoading ? (
@@ -254,12 +268,16 @@ function ResultTable({ jobId, images }: { jobId: string; images: ImageResult[] }
                   {image.page}
                 </TableCell>
                 <TableCell className="max-w-[28rem]">
-                  <span
-                    className={image.caption ? "" : "text-muted-foreground italic"}
-                    title={image.caption ?? undefined}
-                  >
-                    {image.caption ?? "—"}
-                  </span>
+                  {image.caption ? (
+                    <span title={image.caption}>{image.caption}</span>
+                  ) : (
+                    <span
+                      className="text-muted-foreground block whitespace-normal text-xs italic"
+                      title={NO_CAPTION_MESSAGE}
+                    >
+                      {NO_CAPTION_MESSAGE}
+                    </span>
+                  )}
                 </TableCell>
                 <TableCell className="text-right font-mono text-xs">
                   {(image.confidence * 100).toFixed(1)}%

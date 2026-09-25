@@ -40,7 +40,20 @@ export function saveJob(job: StoredJob): void {
   atomicWriteJson(paths.jobFile(job.id), job);
 }
 
+/**
+ * Job ids are machine-generated (`job_<base36 time>_<rand>`). Route params
+ * are user-controlled, so every filesystem use of a jobId passes through
+ * this check first (§30: reject malformed input before it can escape the
+ * data directory).
+ */
+const JOB_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+
+export function isValidJobId(jobId: string): boolean {
+  return JOB_ID_RE.test(jobId);
+}
+
 export function loadJob(jobId: string): StoredJob | null {
+  if (!isValidJobId(jobId)) return null;
   const file = paths.jobFile(jobId);
   if (!existsSync(file)) return null;
   try {

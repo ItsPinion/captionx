@@ -95,6 +95,46 @@ describe("API routes", () => {
     expect(result.status).toBe(404);
   });
 
+  test("§30: malformed (traversal) job ids are rejected on every job route", async () => {
+    // Route params are user-controlled; a jobId like ../../etc must never
+    // reach the filesystem — every route answers 404.
+    for (const path of [
+      "/jobs/..%2F..%2Fetc",
+      "/jobs/..%2F..%2Fetc/result",
+      "/jobs/..%2F..%2Fetc/json",
+      "/jobs/..%2F..%2Fetc/csv",
+      "/jobs/..%2F..%2Fetc/images.zip",
+      "/jobs/..%2F..%2Fetc/image/x.png",
+    ]) {
+      const res = await app.request(path);
+      expect(res.status).toBe(404);
+    }
+  });
+
+  test("§30: unknown job → 404 with useful error on download routes too", async () => {
+    for (const path of [
+      "/jobs/job_unknown123/json",
+      "/jobs/job_unknown123/csv",
+      "/jobs/job_unknown123/images.zip",
+      "/jobs/job_unknown123/image/x.png",
+    ]) {
+      const res = await app.request(path);
+      expect(res.status).toBe(404);
+      const body = await res.json();
+      expect(typeof body.error).toBe("string");
+    }
+  });
+
+  test("§30: upload with no files → 400 with useful error", async () => {
+    const res = await app.request("/jobs/upload", {
+      method: "POST",
+      body: new FormData(),
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain("no files");
+  });
+
   test("image route blocks path traversal", async () => {
     const form = new FormData();
     form.append("files", makePdfFile("trav.pdf", TINY_PDF_BYTES));

@@ -55,6 +55,22 @@ with a web dashboard, a global FIFO job queue, and structured JSON/CSV output.
 - All browser calls go through the same-origin Next.js rewrite
   (`/api/* → :4000/*`) using the Hono RPC client (`AppType`).
 
+**Phases 30–31 — Error handling** ✅
+
+- API (§30): consistent `{error}` bodies — invalid files and failed URL
+  downloads reported per file/URL, unknown or malformed (traversal) job ids
+  rejected with 404 before touching the filesystem, unavailable results →
+  409 with the job's status; no generic retry engine (failed jobs stay
+  failed until resubmitted, §24/§30).
+- Python (§30): every failure writes `status.json` with
+  `{status: "failed", stage, message}` across the six stages (input,
+  pdf_parse, image_extraction, ocr, matching, output); the worker surfaces
+  it as the job's `error`.
+- UI (§31): friendly copy only — "Could not process this PDF" (+ engine
+  stage line as secondary detail), "Could not download PDF — …",
+  "No caption could be confidently identified for this image" on
+  caption_not_found rows and in the preview dialog. No stack traces.
+
 ## Quick start
 
 ```bash

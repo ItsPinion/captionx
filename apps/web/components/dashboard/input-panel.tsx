@@ -24,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { urlFailureMessage } from "@/lib/errors";
 import { useSubmitUploads, useSubmitUrls } from "@/lib/hooks";
 
 function formatBytes(n: number): string {
@@ -262,19 +263,22 @@ function UrlsMode() {
       )}
 
       {submit.isSuccess && (
-        <ul className="flex flex-col gap-1">
+        <ul className="flex flex-col gap-1.5">
           {submit.data.results.map((r) => (
-            <li key={r.url} className="flex items-start gap-1.5 text-xs">
-              {r.ok ? (
-                <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
-              ) : (
-                <XCircle className="text-destructive mt-0.5 size-3.5 shrink-0" />
-              )}
-              <span className="min-w-0 flex-1 truncate">{r.url}</span>
-              {r.error ? (
-                <Badge variant="destructive">{r.error}</Badge>
-              ) : (
-                <Badge variant="secondary">queued</Badge>
+            <li key={r.url} className="flex flex-col gap-0.5 text-xs">
+              <span className="flex items-start gap-1.5">
+                {r.ok ? (
+                  <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
+                ) : (
+                  <XCircle className="text-destructive mt-0.5 size-3.5 shrink-0" />
+                )}
+                <span className="min-w-0 flex-1 truncate">{r.url}</span>
+                {r.ok && <Badge variant="secondary">queued</Badge>}
+              </span>
+              {!r.ok && r.error && (
+                <span className="text-destructive pl-5">
+                  {urlFailureMessage(r.error)}
+                </span>
               )}
             </li>
           ))}

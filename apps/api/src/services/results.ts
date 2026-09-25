@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, join, resolve, sep } from "node:path";
 
 import { paths } from "../config";
+import { isValidJobId } from "../jobs/store";
 
 /**
  * Completed-result serving (plan.md §21 routes) + images.zip (§28).
@@ -12,17 +13,20 @@ import { paths } from "../config";
  */
 
 export function resultsJsonPath(jobId: string): string | null {
+  if (!isValidJobId(jobId)) return null; // §30: ids come from route params
   const path = paths.resultsJson(jobId);
   return existsSync(path) ? path : null;
 }
 
 export function resultsCsvPath(jobId: string): string | null {
+  if (!isValidJobId(jobId)) return null;
   const path = paths.resultsCsv(jobId);
   return existsSync(path) ? path : null;
 }
 
 /** Resolve a requested image filename safely inside the job's images dir. */
 export function imageFilePath(jobId: string, filename: string): string | null {
+  if (!isValidJobId(jobId)) return null;
   const imagesDir = resolve(paths.imagesDir(jobId));
   const candidate = resolve(imagesDir, basename(filename));
   if (!candidate.startsWith(imagesDir + sep)) return null; // traversal guard
@@ -31,6 +35,7 @@ export function imageFilePath(jobId: string, filename: string): string | null {
 }
 
 export function listImageFiles(jobId: string): string[] {
+  if (!isValidJobId(jobId)) return [];
   const dir = paths.imagesDir(jobId);
   if (!existsSync(dir)) return [];
   return readdirSync(dir).filter((name) => statSync(join(dir, name)).isFile());
