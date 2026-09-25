@@ -46,6 +46,20 @@ Result on the fixtures: **2,551 raw placements → 28 figure occurrences**
 (13 + 8 + 7 across chapters 1/5/12), visually spot-checked (cell diagrams,
 portraits, experiment setups all correct).
 
+**Phase 8 — matching features ✅ (`src/matching/features.py`)**
+
+Eight named 0..1 features per `(image, candidate)` pair (§14): `proximity`
+(gap/window decay, per-window), `alignment` (x-center delta, 150pt scale),
+`overlap` (x-projection ratio vs narrower box), `position` (below 1.0 /
+above 0.35), `keyword` (fig/figure/image/plate/diagram — start 1.0, mid-text
+0.6, never required), `numbering` (chapter.number at start 1.0, bare `Fig. N`
+0.7, mid-text reference 0.4), `sublabel` (standalone `(a)`/`(ii)` flagged for
+demotion), `text_shape` (10–200 chars ideal, short floor 0.35, decay beyond;
+line-count decay). §14.8 font signals deliberately skipped (documented).
+Patterns mined from fixtures: all true captions are `Fig`-prefixed in four
+formatting variants. `scripts/debug_features.py` shows features on real
+candidates — true captions separate cleanly (`key=1 num=1` vs noise 0/0).
+
 **Phase 7 — caption candidate detection ✅ (`src/matching/candidates.py`)**
 
 Per figure (§13): same-page text blocks → base filters (page numbers, running
