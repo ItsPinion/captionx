@@ -57,9 +57,17 @@ SCORE_CONFIG = ScoreConfig()
 
 
 def layout_feature(features: dict[str, float], cfg: ScoreConfig = SCORE_CONFIG) -> float:
-    """The §15 layout bucket: relative position blended with horizontal overlap."""
+    """The §15 layout bucket: relative position blended with horizontal overlap.
+
+    Final plan §11: PP-DocLayout-S `figure_title` evidence (flagged as
+    `layout_caption` by the feature stage) floors this bucket — a detected
+    caption region is stronger layout signal than geometry alone.
+    """
     share = cfg.layout_position_share
-    return share * features["position"] + (1.0 - share) * features["overlap"]
+    blend = share * features["position"] + (1.0 - share) * features["overlap"]
+    if features.get("layout_caption"):
+        return max(blend, 0.95)
+    return blend
 
 
 def score_candidate(

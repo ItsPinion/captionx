@@ -33,6 +33,8 @@ mapping.
 
 ```text
 PyMuPDF  — embedded raster extraction + text blocks with exact geometry
++ PP-DocLayout-S (PaddleX, vendored weights) — per-page layout regions:
+  figure / figure-title evidence → OCR targeting, scan-page handling, coverage audit
 + PaddleOCR (PP-OCRv5, vendored models) — only for pages without usable native text
 + spatial/textual matching — candidate windows → weighted features → thresholds
 ```
@@ -196,7 +198,15 @@ Per image occurrence, on the same page only:
 5. **Series passthrough** — stacked multi-raster figures (one caption for
    parts a/b/c): a figure directly above (≤80 pt, shared column) a series
    winner inherits its caption at ×0.85 confidence.
-6. Anything left is **`caption_not_found`** — never a guess.
+6. **Layout evidence (PP-DocLayout-S)** — every page runs a 150 dpi pass of
+   the vendored PP-DocLayout-S model; `figure_title` regions tag their
+   containing text blocks, and a layout-tagged caption floors the layout
+   bucket (0.5·position + 0.5·overlap) at **0.95** — DL layout evidence
+   boosts, but never gates (a missed detection degrades to pre-layout
+   behavior). The same pass targets OCR at caption crops on OCR-needed
+   pages, lets scanned full-page rasters match via their overlapping
+   figure region, and audits coverage (figure regions with no raster).
+7. Anything left is **`caption_not_found`** — never a guess.
 
 Caption text is preserved exactly as printed (no normalization); only
 scoring sees a normalized copy.
@@ -213,8 +223,9 @@ scoring sees a normalized copy.
 - Unusual layouts can produce ambiguous matches; the tuner is NCERT-layout
   optimized, and windows are deliberately tight to protect precision.
 - Only one PDF is processed at a time (global FIFO) — by design.
-- Scanned/image-only PDFs without embedded raster objects yield no images at
-  all (nothing is embedded to extract).
+- Image-only "scanned" pages (one full-page raster) are handled via
+  PP-DocLayout-S figure regions + targeted OCR, but every text line lives in
+  pixels, so OCR quality bounds caption quality on such documents.
 
 ## 10. Accuracy
 
@@ -227,10 +238,37 @@ Only personally verified results are reported (full evidence in
 | **Assessment chapters** — ch05 *Cell* + ch12 *Sound* | **13/13 = 100%** of captioned embedded images matched (6/6 + 7/7), **0 false mappings** — every row visually verified |
 | ch01 *Matter* (support) | 11/11 matched, visually verified |
 | Exact pins | ch01 14 images/11 matched/3 not-found · ch05 8/6/2 · ch12 9/7/2 — all 7 `caption_not_found` inspected and correct (portraits, Exercises art) |
+The two frozen assessment chapters and their ground truth live in
+[assessment/](./assessment) — `ground_truth.csv` (17 legitimate
+occurrences, 13 captioned), `errors.md` (final run: no mismatches), and
+`accuracy.md` with the filled §53 table, recomputable at any time via
+`assessment/calculate_accuracy.py`:
+
+| Metric | ch05 Cell | ch12 Sound | Combined |
+|---|---|---|---|
+| Image extraction coverage | 100.00% | 100.00% | 100.00% |
+| Image-caption accuracy | 100.00% | 100.00% | **100.00% (13/13)** |
+
 | **Unseen generalization set** (7 PDFs never used for tuning: NCERT ch02/ch08/ch11, Hindi-medium ch05, 3 degenerate pdf.js test PDFs) | 28 images extracted, 15 matched — **every match visually adjudicated true, 0 false mappings**; all 12 non-matches correct abstentions (Exercises art, vector-scope figures, portraits, non-Unicode text) |
 
 The ≥95% target is met with margin on the verified denominator (captioned
 embedded raster images in the pinned chapters).
+
+**Precision & recall, explicitly.** With the standard definitions over the
+verified assessment set (ch05 + ch12):
+
+- true positives (TP) = images matched to their correct printed caption =
+  **13** (6 + 7, each visually confirmed)
+- false positives (FP) = images matched to a wrong caption = **0**
+- false negatives (FN) = captioned images reported `caption_not_found` =
+  **0** (all 7 `caption_not_found` rows are genuinely uncaptioned images —
+  portraits / Exercises art — so they are neither TP nor FN)
+
+recall = TP / (TP + FN) = 13 / (13 + 0) = **100%** — every captioned image
+was found. precision = TP / (TP + FP) = 13 / 13 = **100%** — no wrong
+captions. (A stage-level metric, candidate recall — every true `Fig.`
+caption block landing in the candidate set — is measured separately at
+20/20 in [extraction/README.md](./extraction/README.md).)
 
 ## Testing & CI
 

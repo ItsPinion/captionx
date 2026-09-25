@@ -19,7 +19,14 @@ from typing import Callable, Optional
 import pymupdf
 
 from src.matching import match_document
-from src.models import DocumentSource, MatchResult
+from src.models import BBox, DocumentSource, LayoutRegion, MatchResult
+from src.ocr.layout import (
+    CAPTION_LABELS,
+    IMAGE_LABELS,
+    LayoutModelUnavailable,
+    LAYOUT_DPI,
+    get_layout_engine,
+)
 from src.ocr.pipeline import apply_ocr_when_needed
 from src.pdf.extractor import DocumentExtraction, document_metadata, extract_page
 from src.output import write_results_csv, write_results_json
@@ -54,6 +61,48 @@ class PipelineOutcome:
 
 def _noop_report(stage: str, message: str) -> None:
     return None
+
+
+def _tag_caption_regions(page) -> None:
+    """Tag text blocks inside a PP-DocLayout-S `figure_title` region (§11)."""
+    caption_regions = [r for r in page.layout_regions if r.label in CAPTION_LABELS]
+    if not caption_regions:
+        return
+    for region in page.text_regions:
+        if region.layout_label is not None:
+            continue
+        center_x = (region.bbox.x0 + region.bbox.x1) / 2.0
+        center_y = (region.bbox.y0 + region.bbox.y1) / 2.0
+        for cr in caption_regions:
+            if (
+                cr.bbox.x0 <= center_x <= cr.bbox.x1
+                and cr.bbox.y0 <= center_y <= cr.bbox.y1
+            ):
+                region.layout_label = cr.label
+                region.layout_confidence = cr.confidence
+                break
+
+
+def _count_uncovered_figures(page) -> int:
+    """Figure regions with no extracted raster — vector-scope figures (§2.3)."""
+    image_regions = [r for r in page.layout_regions if r.label in IMAGE_LABELS]
+    if not image_regions:
+        return 0
+    placed = [f.occurrence.bbox for f in page.figures if f.occurrence.bbox is not None]
+    uncovered = 0
+    for region in image_regions:
+        covered = False
+        for bbox in placed:
+            overlap = region.bbox.horizontal_overlap(bbox) * max(
+                0.0, min(region.bbox.y1, bbox.y1) - max(region.bbox.y0, bbox.y0)
+            )
+            area = max(1e-6, region.bbox.width * region.bbox.height)
+            if overlap / area >= 0.3:
+                covered = True
+                break
+        if not covered:
+            uncovered += 1
+    return uncovered
 
 
 def validate_input(pdf_path: Path) -> None:
@@ -105,6 +154,10 @@ def run_pipeline(
         raise StageError("pdf_parse", f"failed to parse {pdf_path.name}: {exc}") from exc
 
     ocr_pages = 0
+    layout_ok = True
+    layout_pages = 0
+    figure_regions = 0
+    uncovered_regions = 0
     try:
         report("image_extraction", f"extracting images from {doc.page_count} page(s)")
         for page_no in range(1, doc.page_count + 1):
@@ -122,10 +175,40 @@ def run_pipeline(
                 raise StageError(
                     "image_extraction", f"failed to write images: {exc}"
                 ) from exc
+
+            # Final plan §11: PP-DocLayout-S layout analysis on the rendered
+            # page — figure + caption regions in PDF points. The model is
+            # loaded once (§41.2) and reused; if the vendored weights are
+            # unavailable the pipeline degrades to native+OCR only.
+            page_layout: list[LayoutRegion] = []
+            if layout_ok:
+                try:
+                    engine = get_layout_engine()
+                except LayoutModelUnavailable as exc:
+                    layout_ok = False
+                    report("image_extraction", f"layout: {exc}")
+                else:
+                    try:
+                        page_layout = engine.detect_page(doc, page_no, dpi=LAYOUT_DPI)
+                    except Exception as exc:
+                        raise StageError(
+                            "image_extraction", f"layout detection failed: {exc}"
+                        ) from exc
+            page.layout_regions = page_layout
+            _tag_caption_regions(page)
+            if page_layout:
+                layout_pages += 1
+                figure_regions += sum(1 for r in page_layout if r.label in IMAGE_LABELS)
+                uncovered_regions += _count_uncovered_figures(page)
+
             # Stage ocr: merge OCR regions when the native text is unusable
             # (loads models lazily — usually a no-op on NCERT chapters).
+            # PP-DocLayout-S caption regions target the OCR crops (§12).
             try:
-                if apply_ocr_when_needed(doc, page):
+                caption_regions = (
+                    [r for r in page_layout if r.label in CAPTION_LABELS] or None
+                )
+                if apply_ocr_when_needed(doc, page, caption_regions=caption_regions):
                     ocr_pages += 1
             except StageError:
                 raise
@@ -133,6 +216,11 @@ def run_pipeline(
                 raise StageError("ocr", f"OCR stage failed: {exc}") from exc
             extraction.pages.append(page)
         report("image_extraction", f"{doc.page_count} page(s) processed")
+        report(
+            "image_extraction",
+            f"layout: {layout_pages} page(s) analyzed, {figure_regions} figure region(s)"
+            + (f", {uncovered_regions} without raster (vector-scope)" if uncovered_regions else ""),
+        )
         report("ocr", "checking pages for OCR need")
         report("ocr", f"ocr ran on {ocr_pages} page(s)")
     finally:

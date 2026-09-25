@@ -34,6 +34,7 @@ from dataclasses import dataclass
 from typing import Sequence
 
 from src.models import BBox, CaptionCandidate, ImageOccurrence
+from src.ocr.layout import CAPTION_LABELS
 
 __all__ = [
     "FEATURE_CONFIG",
@@ -93,6 +94,10 @@ class FeatureConfig:
     shape_decay_chars: int = 400  # linear decay reach beyond the ideal band
     shape_max_ideal_lines: int = 3
     shape_min_lines: int = 7
+    #: Final plan §11: a candidate block sitting inside a PP-DocLayout-S
+    #: `figure_title` region is strong layout evidence of a caption — the
+    #: §15 layout bucket never scores below this for such blocks.
+    layout_caption_floor: float = 0.95
 
 
 #: Default configuration (NCERT-tuned).
@@ -198,7 +203,12 @@ def annotate_candidate(
     """Fill `candidate.features` in place (mutates and returns it)."""
     if image.bbox is None:
         raise ValueError(f"image {image.image_id} has no bbox — cannot compute features")
-    candidate.features = compute_features(image.bbox, candidate.bbox, candidate.text, cfg)
+    features = compute_features(image.bbox, candidate.bbox, candidate.text, cfg)
+    if candidate.layout_label in CAPTION_LABELS:
+        # PP-DocLayout-S says this block IS a caption region (final plan §11):
+        # the flag floors the §15 layout bucket in the scorer.
+        features["layout_caption"] = 1.0
+    candidate.features = features
     return candidate
 
 

@@ -19,6 +19,7 @@ source; fallback and passthrough matches → `fallback`; unresolved →
 from __future__ import annotations
 
 from src.models import (
+    BBox,
     CaptionCandidate,
     ImageOccurrence,
     MatchMethod,
@@ -39,6 +40,7 @@ from .confidence import (
     ConfidenceConfig,
     evaluate_top_candidate,
 )
+from src.ocr.layout import IMAGE_LABELS
 from .fallback import (
     FALLBACK_CANDIDATE_CONFIG,
     FALLBACK_CONFIDENCE_CONFIG,
@@ -69,10 +71,18 @@ def _best_of(
     feature_cfg: FeatureConfig,
     score_cfg: ScoreConfig,
     confidence_cfg: ConfidenceConfig,
+    *,
+    bbox_override=None,
+    page_scan: bool = False,
 ):
     """One pass: candidates → features → scores → (best, confidence, accepted)."""
     candidates: list[CaptionCandidate] = collect_candidates(
-        image, regions, page_height=page_height, cfg=candidate_cfg
+        image,
+        regions,
+        page_height=page_height,
+        cfg=candidate_cfg,
+        bbox_override=bbox_override,
+        page_scan=page_scan,
     )
     annotate_candidates(image, candidates, feature_cfg)
     score_candidates(candidates, score_cfg)
@@ -80,7 +90,14 @@ def _best_of(
     return evaluate_top_candidate(ranked, confidence_cfg)
 
 
-def match_image(image, regions, page_height: float):
+def match_image(
+    image,
+    regions,
+    page_height: float,
+    *,
+    bbox_override=None,
+    page_scan: bool = False,
+):
     """Strict pass then fallback pass for one image → MatchResult."""
     best, confidence, accepted = _best_of(
         image,
@@ -90,6 +107,8 @@ def match_image(image, regions, page_height: float):
         FEATURE_CONFIG,
         SCORE_CONFIG,
         CONFIDENCE_CONFIG,
+        bbox_override=bbox_override,
+        page_scan=page_scan,
     )
     if accepted and best is not None:
         return MatchResult(
@@ -108,6 +127,8 @@ def match_image(image, regions, page_height: float):
         FALLBACK_FEATURE_CONFIG,
         FALLBACK_SCORE_CONFIG,
         FALLBACK_CONFIDENCE_CONFIG,
+        bbox_override=bbox_override,
+        page_scan=page_scan,
     )
     if accepted and best is not None:
         return MatchResult(
@@ -128,6 +149,37 @@ def match_image(image, regions, page_height: float):
     )
 
 
+def _page_scan_context(
+    occurrence_bbox, page
+) -> tuple[BBox | None, bool]:
+    """Effective bbox + page-scan flag for one occurrence (final plan §11).
+
+    A raster covering most of the page is a page scan: every text block sits
+    "inside" it, so the matcher uses the best-overlapping PP-DocLayout-S
+    figure region as the effective image bbox and disables the
+    figure-internal filter. Native multi-figure pages are unaffected.
+    """
+    if occurrence_bbox is None or page.page_width is None or page.page_height is None:
+        return None, False
+    page_area = page.page_width * page.page_height
+    bbox_area = occurrence_bbox.width * occurrence_bbox.height
+    if page_area <= 0 or bbox_area < 0.7 * page_area:
+        return None, False
+    best = None
+    best_ratio = 0.0
+    for region in page.layout_regions:
+        if region.label not in IMAGE_LABELS:
+            continue
+        overlap = (
+            occurrence_bbox.horizontal_overlap(region.bbox)
+            * max(0.0, min(occurrence_bbox.y1, region.bbox.y1) - max(occurrence_bbox.y0, region.bbox.y0))
+        )
+        ratio = overlap / max(1e-6, region.bbox.width * region.bbox.height)
+        if ratio >= 0.5 and ratio > best_ratio:
+            best, best_ratio = region.bbox, ratio
+    return best, True
+
+
 def match_document(document: DocumentExtraction) -> dict[str, MatchResult]:
     """Final `MatchResult` per image occurrence of the document."""
     results: dict[str, MatchResult] = {}
@@ -138,10 +190,13 @@ def match_document(document: DocumentExtraction) -> dict[str, MatchResult]:
         # the exact full caption text wins (both passes use the same regions).
         regions = merge_split_captions(page.text_regions)
         for figure in page.figures:
+            bbox_override, page_scan = _page_scan_context(figure.occurrence.bbox, page)
             results[figure.occurrence.image_id] = match_image(
                 figure.occurrence,
                 regions,
                 page_height=page.page_height or 842.0,
+                bbox_override=bbox_override,
+                page_scan=page_scan,
             )
 
     series_passthrough(figures, results)

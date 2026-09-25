@@ -24,5 +24,22 @@ fetch 90f76a83768033cbd2bc9aa4d10aaa08e7bf25f7 models/official_models/PP-OCRv5_m
 fetch 0c59d012d05e56c29b3605c31d940e2d65db1948 models/official_models/PP-OCRv5_mobile_rec/inference.pdiparams
 fetch 176f6d552a120e6fa0a812089fb36c1bb983ce28 models/official_models/PP-OCRv5_mobile_rec/inference.yml
 
+# PP-DocLayout-S (final plan §11) — vendored from a public GitHub mirror of
+# the official PaddleOCR inference package (inference.json is the paddle 3.x
+# PIR-format model; documented size ≈ 4.8 MB).
+mkdir -p models/official_models/PP-DocLayout-S
+DL="heyun666/PP-DocLayout-S_infer_onnx"
+fetch_raw() { # fetch <repo> <path> <dest>
+  [ -s "$3" ] && return 0
+  if command -v gh >/dev/null 2>&1; then
+    gh api "repos/$1/contents/$2" -H "Accept: application/vnd.github.raw" > "$3"
+  else
+    curl -fsSL --max-time 120 "https://raw.githubusercontent.com/$1/HEAD/$2" > "$3"
+  fi
+}
+fetch_raw "$DL" "models/inference.json"     models/official_models/PP-DocLayout-S/inference.json
+fetch_raw "$DL" "models/inference.pdiparams" models/official_models/PP-DocLayout-S/inference.pdiparams
+fetch_raw "$DL" "models/inference.yml"      models/official_models/PP-DocLayout-S/inference.yml
+
 echo "models present:"
 find models/official_models -type f -exec ls -la {} \;

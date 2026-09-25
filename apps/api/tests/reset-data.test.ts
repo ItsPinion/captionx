@@ -24,9 +24,13 @@ describe("resetDataDirs", () => {
     writeFileSync(join(config.resultsDir, "job_reset01", "results.csv"), "image\n");
     writeFileSync(join(resDir, "page_01_image_01.png"), "PNG");
 
+    // resetDataDirs counts top-level entries per tree (uploads + jobs +
+    // results), not recursive files — the two result files live inside the
+    // results/job_reset01 dir. Exactly one planted entry per tree → 3 when
+    // isolated; ≥3 also tolerates leftover entries from sibling test files.
     const removed = resetDataDirs();
 
-    expect(removed).toBeGreaterThanOrEqual(4);
+    expect(removed).toBeGreaterThanOrEqual(3);
     expect(existsSync(jobDir)).toBe(false);
     expect(existsSync(join(config.uploadsDir, "job_reset01_ch.pdf"))).toBe(false);
     expect(existsSync(join(config.resultsDir, "job_reset01"))).toBe(false);

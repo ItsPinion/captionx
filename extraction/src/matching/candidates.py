@@ -205,13 +205,22 @@ def collect_candidates(
     regions: Sequence[TextRegion],
     page_height: float,
     cfg: CandidateConfig = CANDIDATE_CONFIG,
+    *,
+    bbox_override: BBox | None = None,
+    page_scan: bool = False,
 ) -> list[CaptionCandidate]:
     """All caption candidates on `image`'s page, nearest-first.
 
     Same-page only (§13.1); base filters + internal-label filter (§13.3);
     below/above windows (§13.2); exact text preserved (§13.4).
+
+    Final plan §11: for a scanned page (one raster covering most of it)
+    PP-DocLayout-S's figure region is the effective image bbox
+    (`bbox_override`) and the figure-internal filter is disabled — every
+    real text block of a scan sits "inside" the page raster.
     """
-    if image.bbox is None:
+    effective_bbox = bbox_override if bbox_override is not None else image.bbox
+    if effective_bbox is None:
         return []
 
     candidates: list[CaptionCandidate] = []
@@ -220,12 +229,12 @@ def collect_candidates(
             continue
         if not passes_base_filters(region, page_height, cfg):
             continue
-        if is_figure_internal(region.bbox, image.bbox):
+        if not page_scan and is_figure_internal(region.bbox, effective_bbox):
             continue
-        position = _vertical_relation(image.bbox, region.bbox, cfg)
+        position = _vertical_relation(effective_bbox, region.bbox, cfg)
         if position is None:
             continue
-        if not horizontally_related(image.bbox, region.bbox, cfg):
+        if not horizontally_related(effective_bbox, region.bbox, cfg):
             continue
         candidates.append(
             CaptionCandidate(
@@ -233,10 +242,11 @@ def collect_candidates(
                 bbox=region.bbox,
                 source=region.source,
                 image_id=image.image_id,
+                layout_label=region.layout_label,
             )
         )
 
-    image_bbox = image.bbox
+    image_bbox = effective_bbox
     image_x = image_bbox.x_center
 
     def sort_key(candidate: CaptionCandidate) -> tuple[float, float]:

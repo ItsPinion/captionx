@@ -118,8 +118,10 @@ Exercises-page art) — the system never invents captions.
 Open the downloaded files:
 
 - **JSON** — `{document: {filename, source, page_count}, images:
-  [{image, page, caption, confidence, status, method}]}` — one object per
-  image, confidence as a float, exact caption text.
+  [{image, page, caption, confidence, status, method, layout?}]}` — one
+  object per image, confidence as a float, exact caption text. When
+  PP-DocLayout-S analyzed the page, each image also carries additive
+  `layout` evidence (`figure` / `caption_region` label + confidence + bbox).
 - **CSV** — header `image,page,caption,confidence,status,method`, one row
   per image, same values as the dashboard shows.
 - **images.zip** — the extracted PNGs, named
