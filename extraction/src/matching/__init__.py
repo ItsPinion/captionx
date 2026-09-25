@@ -29,9 +29,28 @@ from .confidence import (
     evaluate_top_candidate,
     match_confidence,
 )
+from .fallback import (
+    FALLBACK_CANDIDATE_CONFIG,
+    FALLBACK_CONFIDENCE_CONFIG,
+    FALLBACK_FEATURE_CONFIG,
+    FALLBACK_SCORE_CONFIG,
+    FallbackConfig,
+    FALLBACK_CONFIG,
+    series_passthrough,
+)
+from .matcher import match_document, match_image
 
 __all__ = [
     "CANDIDATE_CONFIG",
+    "FALLBACK_CANDIDATE_CONFIG",
+    "FALLBACK_CONFIDENCE_CONFIG",
+    "FALLBACK_CONFIG",
+    "FALLBACK_FEATURE_CONFIG",
+    "FALLBACK_SCORE_CONFIG",
+    "FallbackConfig",
+    "match_document",
+    "match_image",
+    "series_passthrough",
     "CONFIDENCE_CONFIG",
     "ConfidenceConfig",
     "SCORE_CONFIG",
