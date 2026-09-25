@@ -1,9 +1,23 @@
 # Extraction Engine (Python)
 
-PyMuPDF (native PDF images + text) + PaddleOCR (fallback OCR) + spatial/textual
-caption matching → `results.json` + `results.csv` + `images/`.
+PyMuPDF (native PDF images + text) + **PP-DocLayout-S** (document layout
+regions) + PaddleOCR (fallback OCR) + spatial/textual caption matching →
+`results.json` + `results.csv` + `images/`.
 
-Part of the CaptionX assessment project — see [../plan.md](../plan.md).
+Part of the CaptionX assessment project — see [../plan.md](../plan.md) and
+[../assessment/](../assessment) for the frozen-chapter ground truth and the
+verified §53 accuracy table.
+
+**Final-plan stack — all three models vendored, zero runtime downloads:**
+
+| model | role | weights |
+|---|---|---|
+| PyMuPDF | raster + native-text extraction, geometry | (library) |
+| PP-DocLayout-S | per-page layout regions: `image`/`figure_title` evidence → caption tagging, OCR targeting, scan handling, coverage audit (~0.33 s/page @150 dpi) | `models/official_models/PP-DocLayout-S/` |
+| PaddleOCR PP-OCRv5 mobile | OCR for pages without a usable native text layer | `models/official_models/PP-OCRv5_mobile_{det,rec}/` |
+
+`fetch_models.sh` restores any missing weights byte-exact; the pipeline
+degrades gracefully (pre-layout behavior) if they are absent.
 
 ## Status
 
@@ -266,6 +280,50 @@ Baselines (this machine, native-text path): ch01 0.45 s · ch05 1.67 s
 (composite-heavy) · ch12 0.33 s — **2.45 s for all three chapters**,
 dominated by clip-rendering of composite regions. OCR, when a page needs
 it, adds the engine init (0.21 s) plus ~per-page inference.
+
+## Final plan — PP-DocLayout-S integration ✅ (live-verified)
+
+`src/ocr/layout.py` wraps the vendored PP-DocLayout-S (PaddleX
+`create_model`, PIR weights; `PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT=False`
+works around the OneDNN/PIR crash) behind a `LayoutEngine` singleton:
+
+- one 150 dpi inference per page (~0.33 s), keeping `image` +
+  `figure_title` regions only (px → pt conversion);
+- `_tag_caption_regions`: native/OCR text blocks whose center falls inside
+  a `figure_title` box are tagged (`layout_label` + confidence);
+- **matcher (DL authority — the model decides, not just floors)**:
+  a layout-tagged candidate gets the `layout_caption` feature → the scorer
+  floors the §15 layout bucket at 0.95; §38-merged captions inherit the
+  head's tag; a tagged block is **admitted beyond the strict windows**
+  (within 1.5× the gap, same column — `_layout_admission`); a layout
+  `figure` region beyond the image **bounds the below-window** (candidates
+  starting at/beyond the next figure are soft-barriered,
+  `tag_layout_barriers`); and `_arbitrate` breaks near-ties (≤0.05) toward
+  DL-confirmed candidates and (≤0.15) away from barriered ones. All
+  soft-authority: pinned outputs on the three chapters are byte-identical
+  to the pre-authority run;
+- **OCR targeting**: caption crops (6 pt pad, page-clamped) are OCR'd
+  before any whole-page fallback (`apply_ocr_when_needed(caption_regions=…)`);
+- **scan pages**: a raster covering ≥70% of the page uses its overlapping
+  layout figure region as the effective bbox and skips the
+  figure-internal filter (`tests/test_layout_ocr_e2e.py` proves a scanned
+  page end-to-end: layout → targeted OCR → `matched` via `method=ocr`);
+- **coverage audit**: progress line reports pages analyzed, figure
+  regions, and figure regions with <30% raster coverage (vector-scope);
+- **output**: additive per-image `layout` evidence in `results.json`.
+
+Bench (with layout live, all pins intact): ch01 14/11/3 · ch05 8/6/2 ·
+ch12 9/7/2 · overall 12.4 s for 3 chapters.
+
+## Assessment artifacts (`../assessment/`)
+
+- `selected_chapters.md` — the two frozen chapters + pinned editions.
+- `ground_truth.csv` — 17 legitimate occurrences (13 captioned + 4
+  legitimately uncaptioned), manually verified against page renders.
+- `errors.md` — final run has no mismatches; tuning history documented.
+- `accuracy.md` + `calculate_accuracy.py` — the §53 table: combined
+  **13/13 = 100.00%** (pooled denominator; ≥13 = the 95% bar), coverage
+  100% ×3.
 
 ## Known characteristics of the target NCERT PDFs
 

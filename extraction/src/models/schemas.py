@@ -282,13 +282,49 @@ class ImageOccurrence:
 
 
 @dataclass(kw_only=True)
+class LayoutRegion:
+    """One region from PP-DocLayout-S layout detection (final plan §11).
+
+    Coordinates are PDF points (converted from the render scale at
+    detection time). Only regions with labels relevant to the
+    image/caption task are kept (`image`, `figure_title`).
+    """
+
+    label: str
+    confidence: float
+    bbox: BBox
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "label": self.label,
+            "confidence": self.confidence,
+            "bbox": self.bbox.to_list(),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "LayoutRegion":
+        return cls(
+            label=str(data["label"]),
+            confidence=float(data["confidence"]),
+            bbox=BBox.from_list(data["bbox"]),
+        )
+
+
+@dataclass(kw_only=True)
 class TextRegion:
-    """A block of text with its position and origin (plan.md §9)."""
+    """A block of text with its position and origin (plan.md §9).
+
+    `layout_label`/`layout_confidence` are set when PP-DocLayout-S placed
+    this block inside a detected caption region (`figure_title`) — the
+    matching stage uses that as layout evidence (final plan §11).
+    """
 
     text: str
     bbox: BBox
     source: TextSource
     page: int  # 1-based page number
+    layout_label: Optional[str] = None
+    layout_confidence: Optional[float] = None
 
     def __post_init__(self) -> None:
         if self.page < 1:
@@ -297,12 +333,16 @@ class TextRegion:
             self.source = TextSource(self.source)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        data = {
             "text": self.text,
             "bbox": self.bbox.to_list(),
             "source": self.source.value,
             "page": self.page,
         }
+        if self.layout_label is not None:
+            data["layout_label"] = self.layout_label
+            data["layout_confidence"] = self.layout_confidence
+        return data
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "TextRegion":
@@ -311,6 +351,8 @@ class TextRegion:
             bbox=BBox.from_list(data["bbox"]),
             source=TextSource(data["source"]),
             page=int(data["page"]),
+            layout_label=data.get("layout_label"),
+            layout_confidence=data.get("layout_confidence"),
         )
 
 
@@ -329,9 +371,12 @@ class CaptionCandidate:
     image_id: str
     features: dict[str, float] = field(default_factory=dict)
     score: float = 0.0
+    #: Set when PP-DocLayout-S placed this block inside a `figure_title`
+    #: region (final plan §11) — layout evidence for the scorer.
+    layout_label: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        data = {
             "text": self.text,
             "bbox": self.bbox.to_list(),
             "source": self.source.value,
@@ -339,6 +384,9 @@ class CaptionCandidate:
             "features": dict(self.features),
             "score": self.score,
         }
+        if self.layout_label is not None:
+            data["layout_label"] = self.layout_label
+        return data
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "CaptionCandidate":

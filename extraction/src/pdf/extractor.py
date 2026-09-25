@@ -13,7 +13,14 @@ from typing import Optional
 
 import pymupdf
 
-from src.models import BBox, Document, DocumentSource, ImageOccurrence, TextRegion
+from src.models import (
+    BBox,
+    Document,
+    DocumentSource,
+    ImageOccurrence,
+    LayoutRegion,
+    TextRegion,
+)
 
 from .images import (
     FigureKind,
@@ -62,6 +69,10 @@ class PageExtraction:
     #: Page size in points (for position-aware filtering downstream, §13.3).
     page_width: Optional[float] = None
     page_height: Optional[float] = None
+    #: PP-DocLayout-S regions for this page (final plan §11) — `image` and
+    #: `figure_title` only, in PDF points. Empty when layout analysis did
+    #: not run (model unavailable) or nothing relevant was found.
+    layout_regions: list[LayoutRegion] = field(default_factory=list)
 
 
 @dataclass

@@ -67,13 +67,35 @@ class OCREngine:
                 )
         return self._ocr
 
-    def ocr_page(self, doc: pymupdf.Document, page_no_1based: int) -> list[TextRegion]:
-        """OCR one page (rendered on demand) → OCR-source TextRegions in points."""
+    def ocr_page(
+        self,
+        doc: pymupdf.Document,
+        page_no_1based: int,
+        *,
+        clip: tuple[float, float, float, float] | None = None,
+        layout_label: str | None = None,
+        layout_confidence: float | None = None,
+    ) -> list[TextRegion]:
+        """OCR one page (rendered on demand) → OCR-source TextRegions in points.
+
+        `clip` (page points) restricts the render + OCR to one region —
+        final plan §12: OCR reads caption text from detected caption
+        regions. Regions produced from a clipped crop carry the region's
+        `layout_label`/`layout_confidence` (layout evidence for matching).
+        """
         ocr = self._ensure_loaded()
 
         page = doc[page_no_1based - 1]
         zoom = self.dpi / 72.0
-        pix = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom))
+        matrix = pymupdf.Matrix(zoom, zoom)
+        if clip is not None:
+            clip_rect = pymupdf.Rect(*clip) & page.rect
+            if clip_rect.is_empty:
+                return []
+            pix = page.get_pixmap(matrix=matrix, clip=clip_rect)
+        else:
+            clip_rect = None
+            pix = page.get_pixmap(matrix=matrix)
         try:
             # RGB pixmap → BGR ndarray (the preprocessing convention).
             image = np.frombuffer(pix.samples, dtype=np.uint8).reshape(
@@ -96,19 +118,26 @@ class OCREngine:
         boxes = result.get("rec_boxes")
         if boxes is None:
             return regions
+        crop_offset = (clip_rect.x0, clip_rect.y0) if clip_rect is not None else (0.0, 0.0)
         for text, score, box in zip(texts, scores, boxes):
             cleaned = str(text).strip()
             if not cleaned or float(score) < MIN_REC_SCORE:
                 continue
             x0, y0, x1, y1 = (float(v) for v in box)
-            regions.append(
-                TextRegion(
-                    text=cleaned,
-                    bbox=BBox(x0, y0, x1, y1).scaled(to_points),
-                    source=TextSource.OCR,
-                    page=page_no_1based,
-                )
+            region = TextRegion(
+                text=cleaned,
+                bbox=BBox(
+                    x0 * to_points + crop_offset[0],
+                    y0 * to_points + crop_offset[1],
+                    x1 * to_points + crop_offset[0],
+                    y1 * to_points + crop_offset[1],
+                ),
+                source=TextSource.OCR,
+                page=page_no_1based,
+                layout_label=layout_label,
+                layout_confidence=layout_confidence,
             )
+            regions.append(region)
         return regions
 
     def shutdown(self) -> None:

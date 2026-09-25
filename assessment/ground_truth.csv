@@ -1,0 +1,18 @@
+ground_truth_id,document,page,expected_caption,caption_status
+gt_001,ncert_class9_science_ch05_cell.pdf,1,"Fig. 5.1: Compound microscope",captioned
+gt_002,ncert_class9_science_ch05_cell.pdf,1,"Fig. 5.2: Cells of an onion peel",captioned
+gt_003,ncert_class9_science_ch05_cell.pdf,2,"Fig. 5.3: Various cells from the human body",captioned
+gt_004,ncert_class9_science_ch05_cell.pdf,6,"Fig. 5.4: Prokaryotic cell",captioned
+gt_005,ncert_class9_science_ch05_cell.pdf,7,"Fig. 5.5: Animal cell",captioned
+gt_006,ncert_class9_science_ch05_cell.pdf,8,"Fig. 5.6: Plant cell",captioned
+gt_007,ncert_class9_science_ch05_cell.pdf,8,,source_has_no_caption
+gt_008,ncert_class9_science_ch05_cell.pdf,10,,source_has_no_caption
+gt_009,ncert_class9_science_ch12_sound.pdf,2,"Fig. 12.4: A beam of light from a light source is made  to fall on a mirror. The reflected light is falling on the wall.",captioned
+gt_010,ncert_class9_science_ch12_sound.pdf,3,"Fig. 12.6: Bell jar experiment showing sound cannot travel in vacuum.",captioned
+gt_011,ncert_class9_science_ch12_sound.pdf,4,"Fig. 12.7: Longitudinal wave in a slinky.",captioned
+gt_012,ncert_class9_science_ch12_sound.pdf,10,"Fig 12.12:  A megaphone and a horn.",captioned
+gt_013,ncert_class9_science_ch12_sound.pdf,10,"Fig 12.12:  A megaphone and a horn.",captioned
+gt_014,ncert_class9_science_ch12_sound.pdf,10,"Fig.12.13: Stethoscope",captioned
+gt_015,ncert_class9_science_ch12_sound.pdf,10,"Fig. 12.14: Curved ceiling of a conference hall.",captioned
+gt_016,ncert_class9_science_ch12_sound.pdf,5,,source_has_no_caption
+gt_017,ncert_class9_science_ch12_sound.pdf,15,,source_has_no_caption

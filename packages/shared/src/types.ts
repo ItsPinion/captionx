@@ -59,6 +59,12 @@ export interface ImageResult {
   confidence: number;
   status: ImageStatus;
   method: MatchMethod;
+  /** PP-DocLayout-S layout evidence (final plan §11) — present when the
+   *  page was analyzed and relevant regions overlap this image. */
+  layout?: {
+    figure?: { label: string; confidence: number; bbox: number[] } | null;
+    caption_region?: { label: string; confidence: number; bbox: number[] } | null;
+  };
 }
 
 /** Full extraction output for one document. */
