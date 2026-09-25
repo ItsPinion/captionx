@@ -11,11 +11,27 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-if [ ! -d .venv ]; then
-  echo "== creating venv =="
-  python3 -m venv .venv
+# A venv without a working pip is worse than none: it makes the script die
+# at `pip install` (happens when a previous run was interrupted mid-creation,
+# or a distro ships `python3 -m venv` without ensurepip). Guard on the
+# interpreter AND pip; recreate cleanly instead.
+if [ ! -x .venv/bin/python ] || [ ! -x .venv/bin/pip ]; then
+  echo "== creating venv (fresh) =="
+  python3 -m venv --clear .venv \
+    || { echo "ERROR: 'python3 -m venv' failed."
+         echo "On Debian/Ubuntu: sudo apt install python3-venv python3-pip"
+         exit 1; }
 fi
 PY=.venv/bin/python
+
+# Distro venvs built without ensurepip: bootstrap pip explicitly.
+if [ ! -x .venv/bin/pip ]; then
+  "$PY" -m ensurepip --upgrade >/dev/null 2>&1 \
+    || { echo "ERROR: .venv has no pip and ensurepip is unavailable."
+         echo "On Debian/Ubuntu: sudo apt install python3-venv python3-pip"
+         exit 1; }
+  "$PY" -m pip install --upgrade pip -q
+fi
 
 echo "== installing pinned stack (requirements.txt) =="
 .venv/bin/pip install --upgrade pip -q
