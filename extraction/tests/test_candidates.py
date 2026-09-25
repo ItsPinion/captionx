@@ -7,6 +7,7 @@ from src.matching import (
     CANDIDATE_CONFIG,
     build_page_candidates,
     collect_candidates,
+    merge_split_captions,
     is_figure_internal,
     is_page_number,
     is_running_footer,
@@ -264,3 +265,45 @@ class TestPageAndDocumentBuilders:
     def test_page_without_figures_gives_empty_map(self):
         page = PageExtraction(page=1, figures=[], text_regions=[], page_width=595, page_height=842)
         assert build_page_candidates(page) == {}
+
+
+class TestMergeSplitCaptions:
+    """§38 split_caption fix — measured on NCERT Figs 1.2/1.5/1.6/12.6/12.8."""
+
+    def test_joins_tight_overlapping_continuation(self):
+        head = region("Fig. 1.2: Estimating how small are the particles of", y0=285.7, y1=294.7)
+        cont = region("matter. With every dilution, the colour is still visible.", y0=296.5, y1=316.3)
+        merged = merge_split_captions([head, cont])
+        assert len(merged) == 1
+        assert merged[0].text == (
+            "Fig. 1.2: Estimating how small are the particles of"
+            " matter. With every dilution, the colour is still visible."
+        )
+        # bbox is the union
+        assert merged[0].bbox.y0 == 285.7
+        assert merged[0].bbox.y1 == 316.3
+
+    def test_does_not_join_neighbouring_column_text(self):
+        # The measured trap: body text 2.8 pt below a caption but in the
+        # other column (no x-overlap) — e.g. Fig 5.5 vs "We have talked…".
+        head = region("Fig. 5.5: Animal cell", y0=621.5, y1=630.5, x0=383, x1=473)
+        body = region("We have talked about the nucleus in a previous section.", y0=633.3, y1=700.0, x0=69, x1=296)
+        merged = merge_split_captions([head, body])
+        assert len(merged) == 2
+        assert merged[0].text == "Fig. 5.5: Animal cell"
+
+    def test_does_not_join_next_caption_or_bullet(self):
+        head = region("Fig. 1.4", y0=660.6, y1=669.6, x0=164, x1=200)
+        nxt = region("Fig.1.5: a, b and c show the magnified schematic", y0=677.1, y1=686.1, x0=313, x1=500)
+        bullet = region("• What do you observe? In which case was the piston pushed?", y0=671.0, y1=700.0, x0=80, x1=290)
+        merged = merge_split_captions([head, nxt, bullet])
+        # output is y-sorted; the point is that nothing was absorbed
+        assert sorted(r.text for r in merged) == sorted(
+            [head.text, nxt.text, bullet.text]
+        )
+
+    def test_unrelated_blocks_kept_in_order(self):
+        a = region("Fig. 12.7: Longitudinal wave in a slinky.", y0=100)
+        b = region("Regular body text well below.", y0=200)
+        merged = merge_split_captions([a, b])
+        assert [r.text for r in merged] == [a.text, b.text]

@@ -32,6 +32,7 @@ from .candidates import (
     CANDIDATE_CONFIG,
     CandidateConfig,
     collect_candidates,
+    merge_split_captions,
 )
 from .confidence import (
     CONFIDENCE_CONFIG,
@@ -133,10 +134,13 @@ def match_document(document: DocumentExtraction) -> dict[str, MatchResult]:
     figures = document.figures
 
     for page in document.pages:
+        # §38 split_caption fix: candidates see re-joined caption blocks, so
+        # the exact full caption text wins (both passes use the same regions).
+        regions = merge_split_captions(page.text_regions)
         for figure in page.figures:
             results[figure.occurrence.image_id] = match_image(
                 figure.occurrence,
-                page.text_regions,
+                regions,
                 page_height=page.page_height or 842.0,
             )
 

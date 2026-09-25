@@ -116,3 +116,37 @@ class TestGlobalCounts:
                     assert m.caption, (chapter, image_id)
                     assert m.confidence > 0.5, (chapter, image_id)
                     assert m.method is not MatchMethod.NO_RELIABLE_CANDIDATE
+
+
+class TestSplitCaptionsRejoined:
+    """§38 tuning: PDF-split captions must surface complete (§13.4 exact).
+
+    NCERT splits five captions into consecutive blocks (measured gaps
+    1.8–3.0 pt, same column); `merge_split_captions` re-joins them before
+    scoring, so the stored caption is the full printed sentence.
+    """
+
+    def test_fig_1_2_full_caption(self, results):
+        for index in (1, 2, 3):
+            r = find(results, "ch01", 2, index)
+            assert r.caption and r.caption.startswith("Fig. 1.2:")
+            assert r.caption.rstrip().endswith("it is still visible.")
+
+    def test_fig_1_5_full_caption(self, results):
+        r = find(results, "ch01", 5, 2)
+        assert r.caption and r.caption.startswith("Fig.1.5")
+        assert r.caption.rstrip().endswith("in the three states of matter.")
+
+    def test_fig_1_6_full_caption(self, results):
+        for index in (1, 2):
+            r = find(results, "ch01", 6, index)
+            assert r.caption and r.caption.startswith("Fig. 1.6:")
+            assert r.caption.rstrip().endswith("water to water vapour")
+
+    def test_fig_12_6_full_caption(self, results):
+        r = find(results, "ch12", 3, 1)
+        assert r.caption and r.caption.rstrip().endswith("travel in vacuum.")
+
+    def test_fig_12_8_full_caption(self, results):
+        r = find(results, "ch12", 5, 1)
+        assert r.caption and r.caption.rstrip().endswith("pressure variations.")

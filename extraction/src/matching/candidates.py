@@ -54,6 +54,13 @@ __all__ = [
 #: Matches standalone page numbers: `64`, `— 64 —`, `- 64 -`, `–64–`.
 _PAGE_NUMBER_RE = re.compile(r"^\s*[-–—]?\s*\d{1,4}\s*[-–—]?\s*$")
 
+#: A caption head: `Fig. 1.2: …`, `Fig 12.12: …`, `Fig.12.13: …`.
+_CAPTION_HEAD_RE = re.compile(r"^\s*Fig\.?\s*\d", re.I)
+
+#: Blocks that must never be absorbed as caption continuations: the head of
+#: the *next* caption, or the start of a bulleted list.
+_NOT_CONTINUATION_RE = re.compile(r"^\s*(Fig\.?\s*\d|•)", re.I)
+
 
 @dataclass(frozen=True)
 class CandidateConfig:
@@ -84,6 +91,16 @@ class CandidateConfig:
     #: NCERT captions run 10–120 chars / 9–30 pt tall.
     max_block_chars: int = 600
     max_block_height_pt: float = 260.0
+    #: §38 split_caption fix: a caption head re-joins a following block when
+    #: the continuation starts within this gap. Measured true continuations:
+    #: 1.8–3.0 pt (Figs 1.2, 1.5, 1.6, 12.6, 12.8).
+    continuation_max_gap_pt: float = 3.5
+    #: …and when the block x-ranges overlap (± this slack). The measured trap:
+    #: body text in the *neighbouring column* sits 2.8 pt below a caption but
+    #: never overlaps it horizontally (Fig 5.5 vs "We have talked about…").
+    continuation_x_slack_pt: float = 2.0
+    #: Safety cap on absorbed continuation blocks per caption head.
+    max_continuation_blocks: int = 2
 
 
 #: Default configuration (NCERT-tuned).
@@ -230,6 +247,67 @@ def collect_candidates(
     return candidates
 
 
+def merge_split_captions(
+    regions: Sequence[TextRegion],
+    cfg: CandidateConfig = CANDIDATE_CONFIG,
+) -> list[TextRegion]:
+    """Re-join captions the PDF splitter broke into consecutive blocks (§38).
+
+    NCERT measurement: five true captions (Figs 1.2, 1.5, 1.6, 12.6, 12.8)
+    continue in a second block sitting 1.8–3.0 pt below the head, horizontally
+    overlapping it (same column). Body text in the neighbouring column can be
+    almost as close (2.8 pt) but never overlaps horizontally — so BOTH a tight
+    gap and an x-range overlap are required. Exact block texts are preserved
+    and joined with a single space (§13.4); the bbox is the union.
+    """
+    order = sorted(range(len(regions)), key=lambda i: (regions[i].bbox.y0, regions[i].bbox.x0))
+    used: set[int] = set()
+    merged: list[TextRegion] = []
+
+    for pos, i in enumerate(order):
+        if i in used:
+            continue
+        head = regions[i]
+        text = head.text
+        x0, y0, x1, y1 = head.bbox.x0, head.bbox.y0, head.bbox.x1, head.bbox.y1
+        if _CAPTION_HEAD_RE.match(head.text):
+            for _ in range(cfg.max_continuation_blocks):
+                found: int | None = None
+                for j in order[pos + 1 :]:
+                    if j in used:
+                        continue
+                    other = regions[j]
+                    gap = other.bbox.y0 - y1
+                    if not (0.0 < gap <= cfg.continuation_max_gap_pt):
+                        continue
+                    overlap = (
+                        other.bbox.x0 < x1 + cfg.continuation_x_slack_pt
+                        and x0 < other.bbox.x1 + cfg.continuation_x_slack_pt
+                    )
+                    if not overlap:
+                        continue
+                    if _NOT_CONTINUATION_RE.match(other.text):
+                        continue
+                    found = j
+                    break
+                if found is None:
+                    break
+                used.add(found)
+                cont = regions[found]
+                text = f"{text} {cont.text}"
+                x0, y0 = min(x0, cont.bbox.x0), min(y0, cont.bbox.y0)
+                x1, y1 = max(x1, cont.bbox.x1), max(y1, cont.bbox.y1)
+        merged.append(
+            TextRegion(
+                text=text,
+                bbox=BBox(x0=x0, y0=y0, x1=x1, y1=y1),
+                source=head.source,
+                page=head.page,
+            )
+        )
+    return merged
+
+
 def build_page_candidates(
     page: PageExtraction,
     cfg: CandidateConfig = CANDIDATE_CONFIG,
@@ -237,11 +315,12 @@ def build_page_candidates(
     """Candidates for every figure on one page, keyed by `image_id`."""
     if page.page_height is None:
         raise ValueError("PageExtraction is missing page_height — re-extract with the current extractor")
+    regions = merge_split_captions(page.text_regions, cfg)
     result: dict[str, list[CaptionCandidate]] = {}
     for figure in page.figures:
         result[figure.occurrence.image_id] = collect_candidates(
             figure.occurrence,
-            page.text_regions,
+            regions,
             page_height=page.page_height,
             cfg=cfg,
         )

@@ -4,6 +4,7 @@ from .candidates import (
     CandidateConfig,
     CANDIDATE_CONFIG,
     build_document_candidates,
+    merge_split_captions,
     build_page_candidates,
     collect_candidates,
     is_figure_internal,

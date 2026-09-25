@@ -210,6 +210,28 @@ pdf_parse → image_extraction → ocr → matching → output, atomic writes,
 - Phase 15 (§21): CLI contract above — this is what the Hono API executes.
 - Phase 16 (§22): layout `<output>/{results.json,results.csv,images/}`.
 
+## Phase 32 — NCERT-specific tuning ✅
+
+Assessment chapters: **ch05 (Cell)** and **ch12 (Sound)** — every extracted
+image and mapping manually inspected, plus ch01 for completeness
+(`scripts/tuning_report.py` prints the per-figure verdict + window contents).
+
+Mistake table (§38 categories → findings → action):
+
+| error_type | findings | action |
+|---|---|---|
+| `split_caption` | 5 captions split into consecutive blocks by the PDF (Figs 1.2 ×3 occurrences, 1.5, 1.6 ×2, 12.6, 12.8): continuation sits 1.8–3.0 pt below the head, same column | **fixed** — `merge_split_captions` re-joins head + continuation (gap ≤ 3.5 pt AND x-ranges overlap) before scoring; exact text preserved |
+| (near-miss trap for the merge rule) | Fig 5.5's caption has body text 2.8 pt below it in the *neighbouring column* | the x-overlap requirement rejects it (pinned by unit test) |
+| `false_image` | 6 `caption_not_found` figures are decorative "Exercises" art (girl studying, ×3 chapters) or cut-off scientist name-plates (Hooke; Bose + Einstein — name baked into image pixels) | correctly not matched; `caption_not_found` is the honest verdict (§2.4) |
+| `wrong_nearby_text` | 0 — the no-keyword escape (0.78, above the 0.75 geometry cap) held; the measured `H. R. Hertz`-under-portrait trap stays rejected | none needed |
+| `caption_above/below_image`, `shared_caption`, `ocr_error` | 0 on these chapters (above-captions already covered by the §17 fallback window) | none needed |
+
+Result: same figure/match counts as the Phase-17 pins (ch01 14/11, ch05 8/6,
+ch12 9/8 — 0 false mappings), but the five split captions now carry their
+**complete printed text**, and several confidences rose (e.g. Fig 1.2
+0.74 → 0.80). Pinned by `TestMergeSplitCaptions` (unit) and
+`TestSplitCaptionsRejoined` (fixture-gated).
+
 ## Known characteristics of the target NCERT PDFs
 
 - Rich **native** text layer (~200 text blocks/chapter with coordinates) —
