@@ -36,3 +36,4 @@ Thumbs.db
 
 # sample NCERT fixture PDFs (fetched via extraction/fixtures/download.sh)
 extraction/fixtures/*.pdf
+.pytest_cache/
