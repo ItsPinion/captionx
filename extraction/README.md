@@ -226,11 +226,26 @@ Mistake table (§38 categories → findings → action):
 | `wrong_nearby_text` | 0 — the no-keyword escape (0.78, above the 0.75 geometry cap) held; the measured `H. R. Hertz`-under-portrait trap stays rejected | none needed |
 | `caption_above/below_image`, `shared_caption`, `ocr_error` | 0 on these chapters (above-captions already covered by the §17 fallback window) | none needed |
 
-Result: same figure/match counts as the Phase-17 pins (ch01 14/11, ch05 8/6,
-ch12 9/8 — 0 false mappings), but the five split captions now carry their
-**complete printed text**, and several confidences rose (e.g. Fig 1.2
+Result after Phase 32 + 33: ch01 14/11, ch05 8/6, ch12 9/7 — **31 figures,
+24 matched, 7 caption_not_found, 0 false mappings**; the five split captions
+carry their complete printed text, and several confidences rose (e.g. Fig 1.2
 0.74 → 0.80). Pinned by `TestMergeSplitCaptions` (unit) and
 `TestSplitCaptionsRejoined` (fixture-gated).
+
+## Phase 33 — Manual accuracy verification ✅
+
+Every extracted image on the assessment chapters was rendered and inspected
+(protocol, per-image tables, denominators and the claim:
+[VERIFICATION.md](./VERIFICATION.md)). Outcome: **13/13 = 100%** on captioned
+embedded images (ch05 6/6, ch12 7/7), 0 false mappings.
+
+§33 also caught the one remaining §2.4 violation: the Phase-11 "rescue" of the
+ch12 p5 portrait (caption 138 pt above) — page renders proved that caption
+belongs to the vector Fig 12.8 plot, not the H. R. Hertz biography portrait.
+Fix: fallback above-window 260 → 80 pt (strict 150 → 60 pt); the portrait is
+honestly `caption_not_found` again, and ch01 Fig 1.5 upgraded to the strict
+pass. Pinned by `test_hertz_portrait_not_forced` (fixture) and
+`test_far_above_caption_never_lands_on_portrait` (unit).
 
 ## Known characteristics of the target NCERT PDFs
 

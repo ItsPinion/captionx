@@ -107,6 +107,19 @@ Jobs live in `data/jobs/<id>/job.json`; engine output in
 `CAPTIONX_UPLOADS_DIR`, `CAPTIONX_JOBS_DIR`, `CAPTIONX_RESULTS_DIR`,
 `CAPTIONX_PYTHON_BIN`, `CAPTIONX_MAIN_SCRIPT`, `API_PORT`.
 
+**Phases 32–33 — Tuning & verification** ✅
+
+- Phase 32: split-caption re-join (5 NCERT captions were broken into
+  consecutive blocks) + §38 mistake table — see
+  [extraction/README.md](./extraction/README.md).
+- Phase 33: manual per-image verification on the assessment chapters —
+  **13/13 = 100%** on captioned embedded images, 0 false mappings
+  ([extraction/VERIFICATION.md](./extraction/VERIFICATION.md)). Caught and
+  fixed one §2.4 violation: a biography portrait force-matched to a caption
+  138 pt above it.
+- Pins: ch01 14/11 · ch05 8/6 · ch12 9/7 · 247 extraction + 22 API + 15 web
+  tests.
+
 ## Testing & CI
 
 All suites run locally the same way CI runs them (`.github/workflows/ci.yml`,

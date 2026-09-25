@@ -119,7 +119,8 @@ class TestWindows:
 
     def test_caption_above_within_window(self):
         img = image(y0=300)
-        cands = candidates_for(img, region("Fig. 12.8: pressure variation", y0=170))
+        # caption ends 58 pt above the image — inside the (§33-corrected) 60 pt window
+        cands = candidates_for(img, region("Fig. 12.8: pressure variation", y0=230))
         assert len(cands) == 1
 
     def test_too_far_above_rejected(self):
@@ -129,9 +130,9 @@ class TestWindows:
     def test_window_edges_inclusive(self):
         img = image(y0=300, y1=500)
         at_below_edge = region("just below", y0=600, y1=612)  # gap == 100
-        at_above_edge = region("just above", y0=138, y1=150)  # gap == 150
+        at_above_edge = region("just above", y0=228, y1=240)  # gap == 60
         cands = candidates_for(img, at_below_edge, at_above_edge)
-        assert [c.text for c in cands] == ["just below", "just above"]
+        assert sorted(c.text for c in cands) == ["just above", "just below"]
 
     def test_overlapping_block_counts_as_below(self):
         """Blocks overlapping the image vertically but sticking out below."""
@@ -212,7 +213,9 @@ class TestSharedAndStackedFigures:
         top_cands = collect_candidates(top, regions, page_height=A4_HEIGHT)
         bottom_cands = collect_candidates(bottom, regions, page_height=A4_HEIGHT)
         assert [c.text for c in top_cands] == ["(a)"]
-        assert [c.text for c in bottom_cands] == ["Fig. 1.6: (a) and (b) setups", "(a)"]
+        # §33: the label 68 pt above the bottom image is outside the 60 pt
+        # above-window — only the caption below it is a candidate.
+        assert [c.text for c in bottom_cands] == ["Fig. 1.6: (a) and (b) setups"]
 
     def test_shared_caption_region_reaches_both_images(self):
         """§40 case 7: two adjacent images share a caption region."""

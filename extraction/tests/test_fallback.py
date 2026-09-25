@@ -42,20 +42,26 @@ class TestFallbackRescues:
 
         assert result.status is MatchStatus.MATCHED
         assert result.caption.startswith("Fig.1.5")
-        assert result.method is MatchMethod.FALLBACK
+        # §33: with the above-window tightened to 60 pt, the 141 pt filler
+        # no longer reaches the strict pass — the true caption wins strictly.
+        assert result.method is MatchMethod.NATIVE_TEXT
 
-    def test_above_caption_beats_below_name_label(self):
-        """Measured Fig 12.8 case: true caption 138 pt above, decoy name below."""
+    def test_far_above_caption_never_lands_on_portrait(self):
+        """§33 finding: the ch12 p5 caption 138 pt above belongs to the vector
+        Fig 12.8 plot; the raster below it is the H. R. Hertz biography
+        portrait. Forcing the pair was a Phase-11 false positive — a false
+        mapping is worse than caption_not_found (§2.4)."""
         image = img(x0=58, y0=539, x1=137, y1=632)
-        true_caption = region(
+        far_above = region(
             "Fig. 12.8: Sound propagates as density or pressure variations", 56, 392, 277, 404
         )
-        decoy = region("H. R. Hertz", 74, 633, 130, 643)
+        name_label = region("H. R. Hertz", 74, 633, 130, 643)
 
-        result = match_image(image, [true_caption, decoy], page_height=842.0)
+        result = match_image(image, [far_above, name_label], page_height=842.0)
 
-        assert result.status is MatchStatus.MATCHED
-        assert result.caption.startswith("Fig. 12.8")
+        assert result.status is MatchStatus.CAPTION_NOT_FOUND
+        assert result.caption is None
+        assert result.method is MatchMethod.NO_RELIABLE_CANDIDATE
 
     def test_shared_caption_wins_for_second_image(self):
         """Measured Fig 1.10 case: caption reaches two figures; both map."""

@@ -60,15 +60,23 @@ class TestFallbackRescues:
     def test_fig_1_5_far_below(self, results):
         r = find(results, "ch01", 5, 2)
         assert r.caption and r.caption.startswith("Fig.1.5")
-        assert r.method is MatchMethod.FALLBACK
+        # §33: recovered by the strict pass once the above-window stopped
+        # letting a distant body block create a low-margin competitor.
+        assert r.method in (MatchMethod.FALLBACK, MatchMethod.NATIVE_TEXT)
 
     def test_fig_1_10_shared(self, results):
         r = find(results, "ch01", 13, 2)
         assert r.caption and r.caption.startswith("Fig. 1.10")
 
-    def test_fig_12_8_above(self, results):
+    def test_hertz_portrait_not_forced(self, results):
+        """§33: the ch12 p5 raster is the H. R. Hertz biography portrait; the
+        true Fig 12.8 plot is vector art. The caption 138 pt above must NOT
+        be forced onto the portrait (§2.4: a false mapping is worse than
+        caption_not_found)."""
         r = find(results, "ch12", 5, 1)
-        assert r.caption and r.caption.startswith("Fig. 12.8")
+        assert r.status is MatchStatus.CAPTION_NOT_FOUND
+        assert r.caption is None
+        assert r.method is MatchMethod.NO_RELIABLE_CANDIDATE
 
     def test_fig_12_12_stacked(self, results):
         r = find(results, "ch12", 10, 1)
@@ -105,9 +113,11 @@ class TestGlobalCounts:
             1 for r in results.values() for m in r.values() if m.status is MatchStatus.MATCHED
         )
         not_found = total - matched
+        # §33: the Hertz portrait (ch12 p5) correctly returns to not_found —
+        # the image count is unchanged, its mapping flips matched → not_found.
         assert total == 31
-        assert matched == 25
-        assert not_found == 6
+        assert matched == 24
+        assert not_found == 7
 
     def test_all_matched_have_captions_and_confidence(self, results):
         for chapter, per_image in results.items():
@@ -147,6 +157,7 @@ class TestSplitCaptionsRejoined:
         r = find(results, "ch12", 3, 1)
         assert r.caption and r.caption.rstrip().endswith("travel in vacuum.")
 
-    def test_fig_12_8_full_caption(self, results):
-        r = find(results, "ch12", 5, 1)
-        assert r.caption and r.caption.rstrip().endswith("pressure variations.")
+    def test_fig_12_8_pair_is_vector_art(self, results):
+        """Fig 12.8's plot is vector — no raster pair exists (§33); see
+        test_hertz_portrait_not_forced."""
+        assert find(results, "ch12", 5, 1).caption is None

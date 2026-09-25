@@ -69,9 +69,11 @@ class CandidateConfig:
     #: Primary window: how far below the image a caption may start (§13.2).
     #: Measured true captions: 4–95 pt.
     max_below_gap_pt: float = 100.0
-    #: Secondary window: how far above the image a caption may end (§13.2).
-    #: A genuine above-caption was measured at 138 pt.
-    max_above_gap_pt: float = 150.0
+    #: Secondary window: how far above the image a caption may sit (§13.2).
+    #: Kept small: the measured far "above-caption" (138 pt, ch12 p5) turned
+    #: out to be a biography portrait mispaired in Phase 11 — §33 inspection
+    #: showed no true above-caption beyond ~60 pt in these chapters.
+    max_above_gap_pt: float = 60.0
     #: A block must come this close horizontally to be related at all:
     #: either ≥ `min_horizontal_overlap_ratio` of its width overlaps the
     #: image x-range, or its x-gap to the image is ≤ this slack (catches

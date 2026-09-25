@@ -45,11 +45,15 @@ __all__ = [
 ]
 
 #: Broader windows for the fallback pass (§17 "larger candidate window").
-#: Measured targets: Fig 1.5 at 95 pt below, Fig 12.8 at 138 pt above,
-#: Fig 12.12 at 132 pt below — 160/260 covers all with margin.
+#: Measured targets: Fig 1.5 at 95 pt below, Fig 12.12 at 132 pt below —
+#: 160 pt covers both with margin. The above window stays SMALL (80 pt):
+#: Phase 33 inspection proved the original 260 pt target ("Fig 12.8 at
+#: 138 pt above") was the Heinrich-Hertz biography portrait, not a captioned
+#: figure — its true Fig 12.8 plot is vector art. A false mapping is worse
+#: than caption_not_found (§2.4), so far-above captions are never forced.
 FALLBACK_CANDIDATE_CONFIG = CandidateConfig(
     max_below_gap_pt=160.0,
-    max_above_gap_pt=260.0,
+    max_above_gap_pt=80.0,
 )
 
 #: Proximity decays over the broadened windows, so far captions keep
