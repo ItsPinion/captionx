@@ -1,0 +1,103 @@
+== run 36113744892 / extraction on arena/01a0d461-captionx ==
+═══ pytest-output.log ═══
+........................................................................ [ 30%]
+........................................................................ [ 60%]
+.......F....FFFF..FFF.....................s............................. [ 90%]
+............F..........                                                  [100%]
+=================================== FAILURES ===================================
+___________________ TestCliSuccess.test_real_fixture_via_cli ___________________
+tests/test_main_cli.py:90: in test_real_fixture_via_cli
+    assert statuses.count("matched") == 6
+E   AssertionError: assert 0 == 6
+E    +  where 0 = <built-in method count of list object at 0x7f78e3916640>('matched')
+E    +    where <built-in method count of list object at 0x7f78e3916640> = [].count
+_______________ TestStrictMatchesHold.test_simple_below_captions _______________
+tests/test_matcher_fixtures.py:49: in test_simple_below_captions
+    assert find(results, "ch05", 6, 1).caption.startswith("Fig. 5.4")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_matcher_fixtures.py:43: in find
+    assert image_id in results[chapter], f"{image_id} not in {chapter} results"
+E   AssertionError: page_06_image_01 not in ch05 results
+E   assert 'page_06_image_01' in {}
+_________ TestStrictMatchesHold.test_strict_methods_are_native_or_ocr __________
+tests/test_matcher_fixtures.py:55: in test_strict_methods_are_native_or_ocr
+    r = find(results, "ch05", 6, 1)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_matcher_fixtures.py:43: in find
+    assert image_id in results[chapter], f"{image_id} not in {chapter} results"
+E   AssertionError: page_06_image_01 not in ch05 results
+E   assert 'page_06_image_01' in {}
+__________________ TestFallbackRescues.test_fig_1_5_far_below __________________
+tests/test_matcher_fixtures.py:61: in test_fig_1_5_far_below
+    r = find(results, "ch01", 5, 2)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_matcher_fixtures.py:43: in find
+    assert image_id in results[chapter], f"{image_id} not in {chapter} results"
+E   AssertionError: page_05_image_02 not in ch01 results
+E   assert 'page_05_image_02' in {}
+___________________ TestFallbackRescues.test_fig_1_10_shared ___________________
+tests/test_matcher_fixtures.py:66: in test_fig_1_10_shared
+    r = find(results, "ch01", 13, 2)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_matcher_fixtures.py:43: in find
+    assert image_id in results[chapter], f"{image_id} not in {chapter} results"
+E   AssertionError: page_13_image_02 not in ch01 results
+E   assert 'page_13_image_02' in {}
+_____________ TestFallbackRescues.test_fig_1_6_series_passthrough ______________
+tests/test_matcher_fixtures.py:78: in test_fig_1_6_series_passthrough
+    r = find(results, "ch01", 6, 1)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_matcher_fixtures.py:43: in find
+    assert image_id in results[chapter], f"{image_id} not in {chapter} results"
+E   AssertionError: page_06_image_01 not in ch01 results
+E   assert 'page_06_image_01' in {}
+____ TestCaptionlessFigures.test_decorative_and_portrait_figures_not_found _____
+tests/test_matcher_fixtures.py:93: in test_decorative_and_portrait_figures_not_found
+    r = find(results, chapter, page, index)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_matcher_fixtures.py:43: in find
+    assert image_id in results[chapter], f"{image_id} not in {chapter} results"
+E   AssertionError: page_10_image_01 not in ch01 results
+E   assert 'page_10_image_01' in {}
+_________________________ TestGlobalCounts.test_counts _________________________
+tests/test_matcher_fixtures.py:108: in test_counts
+    assert total == 31
+E   assert 9 == 31
+_____________ TestRealFixturePipeline.test_cell_chapter_end_to_end _____________
+tests/test_pipeline.py:97: in test_cell_chapter_end_to_end
+    assert payload["document"]["page_count"] == 11
+E   assert 21 == 11
+=========================== short test summary info ============================
+FAILED tests/test_main_cli.py::TestCliSuccess::test_real_fixture_via_cli - AssertionError: assert 0 == 6
+ +  where 0 = <built-in method count of list object at 0x7f78e3916640>('matched')
+ +    where <built-in method count of list object at 0x7f78e3916640> = [].count
+FAILED tests/test_matcher_fixtures.py::TestStrictMatchesHold::test_simple_below_captions - AssertionError: page_06_image_01 not in ch05 results
+assert 'page_06_image_01' in {}
+FAILED tests/test_matcher_fixtures.py::TestStrictMatchesHold::test_strict_methods_are_native_or_ocr - AssertionError: page_06_image_01 not in ch05 results
+assert 'page_06_image_01' in {}
+FAILED tests/test_matcher_fixtures.py::TestFallbackRescues::test_fig_1_5_far_below - AssertionError: page_05_image_02 not in ch01 results
+assert 'page_05_image_02' in {}
+FAILED tests/test_matcher_fixtures.py::TestFallbackRescues::test_fig_1_10_shared - AssertionError: page_13_image_02 not in ch01 results
+assert 'page_13_image_02' in {}
+FAILED tests/test_matcher_fixtures.py::TestFallbackRescues::test_fig_1_6_series_passthrough - AssertionError: page_06_image_01 not in ch01 results
+assert 'page_06_image_01' in {}
+FAILED tests/test_matcher_fixtures.py::TestCaptionlessFigures::test_decorative_and_portrait_figures_not_found - AssertionError: page_10_image_01 not in ch01 results
+assert 'page_10_image_01' in {}
+FAILED tests/test_matcher_fixtures.py::TestGlobalCounts::test_counts - assert 9 == 31
+FAILED tests/test_pipeline.py::TestRealFixturePipeline::test_cell_chapter_end_to_end - assert 21 == 11
+9 failed, 229 passed, 1 skipped in 89.24s (0:01:29)
+═══ environment ═══
+Linux runnervmtr4k5 6.17.0-1022-azure #22-Ubuntu SMP Mon Jul 27 17:24:03 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+Python 3.11.16
+numpy==2.3.5
+opencv-contrib-python==4.10.0.84
+opencv-contrib-python-headless==4.10.0.84
+paddleocr==3.7.0
+paddlepaddle==3.3.1
+paddlex==3.7.2
+pillow==12.3.0
+pymupdf==1.28.2
+pytest==9.1.1
+shapely==2.1.2
+═══ results.json (if produced) ═══
+(none)
