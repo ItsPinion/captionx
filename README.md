@@ -35,6 +35,26 @@ with a web dashboard, a global FIFO job queue, and structured JSON/CSV output.
   images.zip` — the backend serves authoritative results; ZIP is a
   dependency-free store-method build (PNGs are already compressed).
 
+**Phases 21–29 — Dashboard** ✅
+
+- Single-page dashboard at `apps/web` (§24): header with live API health,
+  input-mode tabs (**PDF Files** drag & drop / **PDF URLs** rows), queue
+  visualization (§25: processing / waiting / completed / failed), and the
+  results view.
+- TanStack Query integration (§23): mutations for upload + URL submit;
+  status polling at 1.5 s only while jobs are queued/processing — stopped
+  once everything is completed/failed.
+- Results table (§26): image preview (thumbnail → full dialog), page,
+  exact caption, confidence, status badge, method badge.
+- Image selection (§27/§28): per-row checkboxes, select all (includes
+  `caption_not_found` — the image was still validly extracted), individual
+  downloads, and "download selected" zipped client-side with the same
+  dependency-free store-method ZIP builder.
+- JSON / CSV / images.zip buttons (§29) map straight to the backend's
+  generated files — the frontend never reconstructs results.
+- All browser calls go through the same-origin Next.js rewrite
+  (`/api/* → :4000/*`) using the Hono RPC client (`AppType`).
+
 ## Quick start
 
 ```bash

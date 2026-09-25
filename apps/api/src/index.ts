@@ -32,7 +32,14 @@ import {
  *   GET  /health
  */
 
-function notFound(c: any, message: string) {
+import type { Context } from "hono";
+
+/**
+ * NOTE: handler return paths must never be `any` — an `any`-returning
+ * handler makes Hono's RPC client silently drop the route from its
+ * inferred type map (learned the hard way; keep this helper typed).
+ */
+function notFound(c: Context, message: string) {
   return c.json({ error: message }, 404);
 }
 
