@@ -46,6 +46,23 @@ Result on the fixtures: **2,551 raw placements → 28 figure occurrences**
 (13 + 8 + 7 across chapters 1/5/12), visually spot-checked (cell diagrams,
 portraits, experiment setups all correct).
 
+**Phases 9+10 — scoring & confidence ✅ (`src/matching/scorer.py`, `confidence.py`)**
+
+Scorer (§15): plan-example weights — proximity .40, alignment .20, keyword
+.15, numbering .10, text_shape .10, layout .05 (position+overlap blend) —
+plus sub-label demotion (×0.55 for `(a)`/`(ii)`). Confidence (§16):
+`0.7·top + 0.3·margin_ratio`; acceptance needs score ≥ 0.45, confidence
+≥ 0.55, and the evidence gate: `Fig`-start (strong) accepts; zero figure
+words never match on geometry (escape 0.78 > geometry-only max 0.75 — the
+measured `H. R. Hertz`-under-portrait trap); mid-text figure *mentions*
+("shown in Fig. 12.8 above") never match — they describe, not caption.
+
+**Strict-matcher preview on fixtures: 20 accepted, all true Fig captions,
+0 false accepts** (`scripts/debug_match_preview.py`). 11 rejects: 6 correctly
+captionless figures → `caption_not_found`; 5 far/above/shared captions are
+the Phase 11 fallback's targets (Fig 1.5 @95pt, Fig 1.10 shared, Fig 1.6
+stacked pair, Fig 12.12 stacked pair, Fig 12.8 above @138pt).
+
 **Phase 8 — matching features ✅ (`src/matching/features.py`)**
 
 Eight named 0..1 features per `(image, candidate)` pair (§14): `proximity`
