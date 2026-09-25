@@ -46,6 +46,30 @@ Result on the fixtures: **2,551 raw placements → 28 figure occurrences**
 (13 + 8 + 7 across chapters 1/5/12), visually spot-checked (cell diagrams,
 portraits, experiment setups all correct).
 
+**Phase 7 — caption candidate detection ✅ (`src/matching/candidates.py`)**
+
+Per figure (§13): same-page text blocks → base filters (page numbers, running
+footer/header bands, oversized body blocks, figure-internal labels) → primary
+below-window / secondary above-window → horizontal relatedness (own column) →
+`CaptionCandidate`s, nearest-first, text preserved exactly.
+
+All thresholds measured on the fixtures and documented in `CandidateConfig`:
+captions below figures span gaps 4–95 pt (window 100 pt); a genuine
+above-caption sits at 138 pt (window 150 pt); the running footer is a short
+block in the band 110–70 pt from the page bottom (real captions stop ≥20 pt
+below it); horizontal admission = ≥20% overlap or ≤40 pt slack (a real
+indented `Fig. 1.4` has only 10.6 pt overlap).
+
+**Fixture validation: candidate recall 20/20** — every `Fig.` caption block
+whose figure was extracted lands in at least one candidate window. The only
+3 uncaptured `Fig.` captions (1.8, 12.3, 12.5) belong to figures drawn purely
+as vector art (zero raster placements — verified), which is the documented
+Phase 4 boundary, not a candidate-stage failure. Noise candidates (Activity
+boxes, sub-labels like `(a)`, body blocks) are expected — Phases 8–9 scoring
+discriminates them.
+
+`scripts/debug_candidates.py` prints per-figure candidates + the recall check.
+
 **Phase 6 — PaddleOCR integration ✅ (`src/ocr/`)**
 
 Engine validated end-to-end on a raster-only page and on a real fixture page

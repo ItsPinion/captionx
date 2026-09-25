@@ -52,6 +52,9 @@ class PageExtraction:
     #: True once OCR has been merged into `text_regions` (Phase 6); the
     #: matching stage uses this to label methods (native_text vs ocr).
     ocr_used: bool = False
+    #: Page size in points (for position-aware filtering downstream, §13.3).
+    page_width: Optional[float] = None
+    page_height: Optional[float] = None
 
 
 @dataclass
@@ -135,6 +138,8 @@ def extract_page(doc: pymupdf.Document, page_no_1based: int, document_stem: str)
         page=page_no_1based,
         figures=_extract_figures_from_page(doc, page, document_stem),
         text_regions=extract_text_regions(page),
+        page_width=float(page.rect.width),
+        page_height=float(page.rect.height),
     )
 
 
