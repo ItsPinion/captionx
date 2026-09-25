@@ -16,7 +16,7 @@ Part of the CaptionX assessment project — see [../plan.md](../plan.md).
 | OCR text | ✅ PaddleOCR 3.7 PP-OCRv5 mobile models, CPU |
 | obtain bounding boxes | ✅ 87–94 boxes/page with conf 0.91–1.00 |
 
-**Phase 3 — internal data model ✅ (46 tests)**
+**Phase 3 — internal data model ✅ (72 tests)**
 
 `src/models/schemas.py` defines the §9 structures — `Document`,
 `ImageOccurrence` (never deduplicated), `TextRegion` (`native_pdf`/`ocr`),
@@ -27,11 +27,42 @@ relations the caption-matching features (Phases 7–9) build on. Enum string
 values mirror the TypeScript `@captionx/shared` JSON contract; a contract test
 guards them.
 
+**Phase 4 — native PDF extraction ✅ (`src/pdf/`)**
+
+- `text.py` — native text blocks via `get_text("blocks")`, exact text +
+  bbox in points.
+- `images.py` — image *placements* (`get_image_info`) → union-find clusters →
+  classify:
+  - `standalone` — single real-sized raster; original xref pixels extracted
+    (downloadable exactly as embedded), stencil masks fall back to rendering;
+  - `composite` — tile-collage / strip-assembly regions (the dominant figure
+    encoding in these NCERT chapters — see “Known characteristics” below)
+    rendered from the page at 2× zoom, capturing strips + vector art + labels;
+  - `decoration` — page-edge furniture, dropped.
+- `extractor.py` — one-pass page iteration (§41.5); occurrences numbered in
+  reading order; figures keep their PNG bytes + model records together.
+
+Result on the fixtures: **2,551 raw placements → 28 figure occurrences**
+(13 + 8 + 7 across chapters 1/5/12), visually spot-checked (cell diagrams,
+portraits, experiment setups all correct).
+
+**Phase 5 — OCR decision ✅ (`src/ocr/decision.py`)**
+
+Simple rule per §11 (“do not over-engineer”): a page gets OCR only when its
+native text layer is unusable (`< 32` chars — scanned/image-only pages).
+All fixture pages have rich native text (600–3,700 chars), so OCR stays a
+true fallback. `src/ocr/engine.py` implements the §12 engine: PP-OCRv5
+mobile models loaded once per process (singleton), pages rendered at 200 dpi
+only when needed, OCR pixel boxes scaled back to PDF points, per-line
+TextRegions with `source=ocr`, low-confidence lines dropped.
+
 Run the tests:
 
 ```bash
 .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/python -m pytest tests -q
+# slow, real-OCR integration test:
+CAPTIONX_OCR_TEST=1 .venv/bin/python -m pytest tests/test_ocr_engine.py
 ```
 
 
