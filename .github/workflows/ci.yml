@@ -74,7 +74,19 @@ jobs:
         run: ./fixtures/download.sh
 
       - name: Test battery (Phases 2–16 + fixture pins)
-        run: .venv/bin/python -m pytest tests -q
+        run: |
+          set +e
+          .venv/bin/python -m pytest tests -q --tb=short 2>&1 | tee pytest-output.log
+          code=$?
+          if [ $code -ne 0 ]; then
+            # Surface failures as check-run annotations (survive log pruning).
+            grep -E "^(FAILED|ERROR)" pytest-output.log | head -10 | while IFS= read -r line; do
+              echo "::error::${line:0:300}"
+            done
+            echo "── pytest tail ──"
+            tail -n 25 pytest-output.log
+          fi
+          exit $code
 
       - name: "§47 milestone smoke — real CLI on ch05 (pin: 8 images / 6 matched / 2 not_found)"
         run: |
