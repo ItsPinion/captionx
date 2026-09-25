@@ -115,7 +115,12 @@ cd extraction
                     # sample NCERT fixture chapters, runs the test suite
 ```
 
-Python 3.11 is expected; OCR models are already vendored under
+`setup.sh` picks a paddle-compatible Python automatically (paddlepaddle's
+pinned wheels cover CPython 3.9–3.13). Newer-only systems (e.g. Python 3.14
+distros whose apt has no 3.11 package either) are handled two ways: install
+[uv](https://docs.astral.sh/uv/) and re-run — it fetches a standalone 3.11
+without sudo — or use any other 3.9–3.13 interpreter (deadsnakes PPA on
+Ubuntu LTS, brew, pyenv). OCR models are already vendored under
 `extraction/models/official_models/` (no network needed for inference).
 
 ## 6. Running the system

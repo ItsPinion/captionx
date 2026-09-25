@@ -11,20 +11,61 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-# A venv without a working pip is worse than none: it makes the script die
-# at `pip install` (happens when a previous run was interrupted mid-creation,
-# or a distro ships `python3 -m venv` without ensurepip). Guard on the
-# interpreter AND pip; recreate cleanly instead.
-if [ ! -x .venv/bin/python ] || [ ! -x .venv/bin/pip ]; then
-  echo "== creating venv (fresh) =="
-  python3 -m venv --clear .venv \
-    || { echo "ERROR: 'python3 -m venv' failed."
-         echo "On Debian/Ubuntu: sudo apt install python3-venv python3-pip"
-         exit 1; }
-fi
-PY=.venv/bin/python
+# paddlepaddle's pinned wheels exist only for CPython 3.9-3.13 (PyPI), so on
+# a brand-new default python3 (e.g. 3.14) pip silently resolves to nothing
+# and dies with "No matching distribution found". Pick a compatible
+# interpreter explicitly; reuse the venv only when ITS interpreter is
+# compatible too.
+SUPPORTED_PY="3.9 3.10 3.11 3.12 3.13"
 
-# Distro venvs built without ensurepip: bootstrap pip explicitly.
+py_version() { "$1" -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null; }
+py_supported() {
+  local v; v="$(py_version "$1")" || return 1
+  for s in $SUPPORTED_PY; do [ "$v" = "$s" ] && return 0; done
+  return 1
+}
+
+if [ -x .venv/bin/python ] && py_supported .venv/bin/python; then
+  PY=.venv/bin/python                      # healthy, compatible venv — fast path
+else
+  PYBIN=""
+  for cand in python3.13 python3.12 python3.11 python3.10 python3.9 python3; do
+    command -v "$cand" >/dev/null 2>&1 && py_supported "$cand" && { PYBIN="$cand"; break; }
+  done
+  if [ -z "$PYBIN" ]; then
+    # Escape hatch for distros that ship only an unsupported Python (e.g.
+    # Debian/Ubuntu releases with 3.14 as the sole python3 — their apt has
+    # no python3.11 package either): uv fetches a standalone CPython without
+    # sudo. Everything downstream works unchanged.
+    if command -v uv >/dev/null 2>&1; then
+      echo "== no compatible system Python — fetching 3.11 via uv =="
+      uv python install 3.11 \
+        || { echo "ERROR: uv could not fetch Python 3.11."; exit 1; }
+      uv venv --python 3.11 --clear .venv \
+        || { echo "ERROR: 'uv venv --python 3.11' failed."; exit 1; }
+      PY=.venv/bin/python
+    else
+      echo "ERROR: the pinned paddlepaddle ships wheels only for CPython ${SUPPORTED_PY}."
+      echo "Your default python3 is $(py_version python3 2>/dev/null || echo unknown) and no compatible interpreter was found."
+      echo "Pick ONE of:"
+      echo "  no sudo:  curl -LsSf https://astral.sh/uv/install.sh | sh   # then re-run ./setup.sh"
+      echo "  Ubuntu LTS: sudo add-apt-repository ppa:deadsnakes/ppa && sudo apt install python3.11 python3.11-venv"
+      echo "  macOS:      brew install python@3.11"
+      echo "  any OS:     pyenv install 3.11 && pyenv local 3.11"
+      exit 1
+    fi
+  else
+    echo "== creating venv (fresh, $PYBIN $(py_version "$PYBIN")) =="
+    "$PYBIN" -m venv --clear .venv \
+      || { echo "ERROR: '$PYBIN -m venv' failed."
+           echo "On Debian/Ubuntu: sudo apt install python3-venv python3-pip"
+           exit 1; }
+    PY=.venv/bin/python
+  fi
+fi
+
+# A venv without a working pip dies at the first pip call (interrupted run,
+# or a distro venv built without ensurepip) — bootstrap explicitly.
 if [ ! -x .venv/bin/pip ]; then
   "$PY" -m ensurepip --upgrade >/dev/null 2>&1 \
     || { echo "ERROR: .venv has no pip and ensurepip is unavailable."
