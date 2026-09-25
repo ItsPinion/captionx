@@ -46,6 +46,23 @@ Result on the fixtures: **2,551 raw placements → 28 figure occurrences**
 (13 + 8 + 7 across chapters 1/5/12), visually spot-checked (cell diagrams,
 portraits, experiment setups all correct).
 
+**Phase 11 — fallback matching ✅ (`src/matching/fallback.py`, `matcher.py`)**
+
+Two-pass strategy per §17: strict (Phases 9–10) → unresolved images retry
+with broadened windows (below 160 pt / above 260 pt) and keyword/numbering-
+dominant weights (.25/.20 vs placement .45); evidence discipline unchanged —
+zero figure words can never match (escape disabled), mid-text mentions never
+match, same-page only. Plus `series_passthrough`: a winner's "(a)/(b)"
+series caption is offered to an unmatched figure directly above it (≤80 pt,
+same column) — the stacked-NCERT-experiment case. Final rule (§17/§2.4):
+anything left is `caption_not_found`. `match_document()` returns the final
+`MatchResult` per image; `scripts/debug_results.py` prints verdicts.
+
+**Fixture outcome: 25/31 matched with 0 wrong captions; 6 `caption_not_found`
+(all genuinely captionless: two scientist portraits, three Exercises corner
+arts, one Group-Activity art).** The integration test pins these verdicts
+(`tests/test_matcher_fixtures.py`) so Phase 32 tuning cannot regress them.
+
 **Phases 9+10 — scoring & confidence ✅ (`src/matching/scorer.py`, `confidence.py`)**
 
 Scorer (§15): plan-example weights — proximity .40, alignment .20, keyword
