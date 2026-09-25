@@ -41,7 +41,7 @@ jobs:
     name: Extraction tests (Python 3.11)
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write   # diagnostics step pushes failure logs to the ci-debug branch
     defaults:
       run:
         working-directory: extraction
