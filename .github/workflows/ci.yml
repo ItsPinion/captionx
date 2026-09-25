@@ -75,7 +75,7 @@ jobs:
 
       - name: Test battery (Phases 2–16 + fixture pins)
         run: |
-          set +e
+          set -o pipefail
           .venv/bin/python -m pytest tests -q --tb=short 2>&1 | tee pytest-output.log
           code=$?
           if [ $code -ne 0 ]; then
@@ -83,10 +83,57 @@ jobs:
             grep -E "^(FAILED|ERROR)" pytest-output.log | head -10 | while IFS= read -r line; do
               echo "::error::${line:0:300}"
             done
-            echo "── pytest tail ──"
-            tail -n 25 pytest-output.log
           fi
           exit $code
+
+      - name: "§47 milestone smoke — real CLI on ch05 (pin: 8 images / 6 matched / 2 not_found)"
+        run: |
+          set -o pipefail
+          .venv/bin/python main.py \
+            --job-id ci-ch05 \
+            --input fixtures/ncert_class9_science_ch05_cell.pdf \
+            --output /tmp/ci-ch05 2>&1 | tee smoke-output.log
+          .venv/bin/python - <<'PY' 2>&1 | tee -a smoke-output.log
+          import json
+
+          r = json.load(open("/tmp/ci-ch05/results.json"))
+          images = r["images"]
+          matched = sum(1 for i in images if i["status"] == "matched")
+          not_found = sum(1 for i in images if i["status"] == "caption_not_found")
+          assert len(images) == 8, f"expected 8 images, got {len(images)}"
+          assert matched == 6, f"expected 6 matched, got {matched}"
+          assert not_found == 2, f"expected 2 caption_not_found, got {not_found}"
+          print(f"§47 pin OK: 8 images, {matched} matched, {not_found} caption_not_found")
+          PY
+
+      - name: Publish diagnostics to ci-debug branch (failure only)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          OUT="/tmp/diagnostics.log"
+          {
+            echo "== run ${GITHUB_RUN_ID} / ${GITHUB_JOB} on ${GITHUB_REF_NAME} =="
+            for f in pytest-output.log smoke-output.log; do
+              if [ -f "$f" ]; then echo "═══ $f ═══"; tail -n 150 "$f"; fi
+            done
+            echo "═══ environment ═══"
+            uname -a
+            .venv/bin/python -V
+            .venv/bin/pip freeze | grep -Ei "^(pymupdf|paddle|numpy|opencv|pillow|pytest|shapely)"
+            echo "═══ results.json (if produced) ═══"
+            cat /tmp/ci-ch05/results.json 2>/dev/null || echo "(none)"
+          } > "$OUT" 2>&1
+          B64=$(base64 -w0 "$OUT")
+          BR_SHA=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${GITHUB_REF_NAME}" --jq .object.sha)
+          gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/ci-debug" --jq .object.sha >/dev/null 2>&1 \
+            || gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+                 -f ref="refs/heads/ci-debug" -f sha="$BR_SHA" >/dev/null
+          NAME="run-${GITHUB_RUN_ID}-$(date -u +%H%M%S).log"
+          gh api -X PUT "repos/${GITHUB_REPOSITORY}/contents/${NAME}" \
+            -f message="ci diagnostics ${GITHUB_RUN_ID} [skip ci]" \
+            -f branch="ci-debug" \
+            -f content="$B64" --jq .commit.sha && echo "diagnostics pushed to ci-debug/${NAME}"
 
       - name: "§47 milestone smoke — real CLI on ch05 (pin: 8 images / 6 matched / 2 not_found)"
         run: |
