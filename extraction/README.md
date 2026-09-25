@@ -291,9 +291,17 @@ works around the OneDNN/PIR crash) behind a `LayoutEngine` singleton:
   `figure_title` regions only (px → pt conversion);
 - `_tag_caption_regions`: native/OCR text blocks whose center falls inside
   a `figure_title` box are tagged (`layout_label` + confidence);
-- **matcher**: a layout-tagged candidate gets the `layout_caption`
-  feature → the scorer floors the §15 layout bucket (0.5·position +
-  0.5·overlap) at 0.95 — evidence, never a gate;
+- **matcher (DL authority — the model decides, not just floors)**:
+  a layout-tagged candidate gets the `layout_caption` feature → the scorer
+  floors the §15 layout bucket at 0.95; §38-merged captions inherit the
+  head's tag; a tagged block is **admitted beyond the strict windows**
+  (within 1.5× the gap, same column — `_layout_admission`); a layout
+  `figure` region beyond the image **bounds the below-window** (candidates
+  starting at/beyond the next figure are soft-barriered,
+  `tag_layout_barriers`); and `_arbitrate` breaks near-ties (≤0.05) toward
+  DL-confirmed candidates and (≤0.15) away from barriered ones. All
+  soft-authority: pinned outputs on the three chapters are byte-identical
+  to the pre-authority run;
 - **OCR targeting**: caption crops (6 pt pad, page-clamped) are OCR'd
   before any whole-page fallback (`apply_ocr_when_needed(caption_regions=…)`);
 - **scan pages**: a raster covering ≥70% of the page uses its overlapping

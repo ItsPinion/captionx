@@ -91,9 +91,15 @@ Non-negotiables (standing rules):
 
 The layout model must materially serve extraction/matching — not a
 checkbox:
-1. Caption-region evidence: `figure_title` boxes tag OCR/native text
-   blocks; the scorer floors the layout bucket at 0.95 for layout-tagged
-   captions (`layout_caption` feature).
+1. Caption-region evidence + matching authority: `figure_title` boxes tag
+   OCR/native text blocks (§38-merged captions inherit the tag); the scorer
+   floors the layout bucket at 0.95 for layout-tagged captions
+   (`layout_caption` feature); tagged blocks are admitted beyond the tuned
+   windows within sanity bounds; layout `figure` regions bound the
+   below-window (soft barriers); near-tie winners are arbitrated toward
+   DL-confirmed candidates (`_arbitrate`) — all soft-authority, so a
+   missed detection degrades to pre-layout behavior (pinned outputs
+   byte-identical).
 2. OCR targeting: caption crops (6 pt pad) are OCR'd first on OCR-needed
    pages, whole-page OCR as fallback.
 3. Scan handling: a raster covering ≥70% of the page is a page scan — the

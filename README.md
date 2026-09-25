@@ -198,14 +198,18 @@ Per image occurrence, on the same page only:
 5. **Series passthrough** — stacked multi-raster figures (one caption for
    parts a/b/c): a figure directly above (≤80 pt, shared column) a series
    winner inherits its caption at ×0.85 confidence.
-6. **Layout evidence (PP-DocLayout-S)** — every page runs a 150 dpi pass of
-   the vendored PP-DocLayout-S model; `figure_title` regions tag their
-   containing text blocks, and a layout-tagged caption floors the layout
-   bucket (0.5·position + 0.5·overlap) at **0.95** — DL layout evidence
-   boosts, but never gates (a missed detection degrades to pre-layout
-   behavior). The same pass targets OCR at caption crops on OCR-needed
-   pages, lets scanned full-page rasters match via their overlapping
-   figure region, and audits coverage (figure regions with no raster).
+6. **Layout decisions (PP-DocLayout-S)** — every page runs a 150 dpi pass of
+   the vendored PP-DocLayout-S model, and its output *decides* parts of
+   matching: `figure_title` regions tag caption blocks (§38-merged captions
+   inherit the tag) and floor the layout bucket at **0.95**; tagged blocks
+   are **admitted beyond the tuned windows** when the model vouches for
+   them (within sanity bounds); layout `figure` regions **bound the search
+   window** (a candidate starting at/beyond the next figure is demoted);
+   near-ties are **arbitrated toward DL-confirmed candidates**. All rules
+   are soft-authority — a missed detection degrades to the pre-layout
+   behavior, and the pinned chapters' outputs are unchanged by design. The
+   same pass targets OCR at caption crops, lets scanned full-page rasters
+   match via their overlapping figure region, and audits coverage.
 7. Anything left is **`caption_not_found`** — never a guess.
 
 Caption text is preserved exactly as printed (no normalization); only

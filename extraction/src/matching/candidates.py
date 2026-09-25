@@ -34,7 +34,8 @@ import re
 from dataclasses import dataclass
 from typing import Iterable, Optional, Sequence
 
-from src.models import BBox, CaptionCandidate, ImageOccurrence, TextRegion
+from src.models import BBox, CaptionCandidate, ImageOccurrence, LayoutRegion, TextRegion
+from src.ocr.layout import CAPTION_LABELS, IMAGE_LABELS
 from src.pdf.extractor import DocumentExtraction, PageExtraction
 
 __all__ = [
@@ -49,6 +50,7 @@ __all__ = [
     "is_running_footer",
     "is_running_header",
     "passes_base_filters",
+    "tag_layout_barriers",
 ]
 
 #: Matches standalone page numbers: `64`, `— 64 —`, `- 64 -`, `–64–`.
@@ -103,6 +105,18 @@ class CandidateConfig:
     continuation_x_slack_pt: float = 2.0
     #: Safety cap on absorbed continuation blocks per caption head.
     max_continuation_blocks: int = 2
+    #: Final plan §11 (DL-driven matching): a PP-DocLayout-S figure_title-
+    #: tagged block is admitted even beyond the strict windows — DL authority
+    #: — but never farther than this multiple of the window (a "caption" half
+    #: a page away is a misread region, not evidence).
+    layout_admit_gap_factor: float = 1.5
+    #: …and must share the figure's column: ≥ this fraction of the tagged
+    #: block's width overlaps the image x-range (else the x-gap slack applies).
+    layout_admit_min_overlap: float = 0.25
+    #: A layout `figure` region starting this far below the image acts as a
+    #: barrier: a below-candidate at/beyond its top edge belongs to the NEXT
+    #: figure (soft flag — the matcher prefers unbarriered near-ties).
+    barrier_min_figure_gap_pt: float = 4.0
 
 
 #: Default configuration (NCERT-tuned).
@@ -200,6 +214,63 @@ def _vertical_relation(
     return None
 
 
+def _layout_admission(
+    effective_bbox: BBox, region: TextRegion, cfg: CandidateConfig
+) -> Optional[str]:
+    """DL admission (final plan §11): `below`/`above` beyond the windows.
+
+    PP-DocLayout-S labeled this block a caption region. The model — not the
+    tuned gap — decides it belongs to this figure, subject to sanity bounds:
+    within 1.5× the strict window and sharing the figure's column. Returns
+    the position label, or None when the DL claim is out of bounds.
+    """
+    if region.bbox.y0 >= effective_bbox.y1:
+        position = "below"
+        gap = region.bbox.y0 - effective_bbox.y1
+    elif region.bbox.y1 <= effective_bbox.y0:
+        position = "above"
+        gap = effective_bbox.y0 - region.bbox.y1
+    else:
+        return None  # intersecting the image: neither window applies
+    limit = (
+        cfg.max_below_gap_pt if position == "below" else cfg.max_above_gap_pt
+    ) * cfg.layout_admit_gap_factor
+    if gap > limit:
+        return None
+    overlap = effective_bbox.horizontal_overlap(region.bbox)
+    if overlap < cfg.layout_admit_min_overlap * region.bbox.width:
+        x_gap = max(effective_bbox.x0 - region.bbox.x1, region.bbox.x0 - effective_bbox.x1)
+        if x_gap > cfg.horizontal_slack_pt:
+            return None
+    return position
+
+
+def _beyond_layout_barrier(
+    effective_bbox: BBox,
+    candidate_bbox: BBox,
+    layout_regions: Sequence[LayoutRegion],
+    cfg: CandidateConfig,
+) -> bool:
+    """True when a DL `figure` region for ANOTHER figure intervenes.
+
+    A below-candidate starting at/beyond the top edge of the next figure
+    region (same column, region strictly below our image) most likely
+    captions that next figure — the DL-drawn figure boundary bounds our
+    candidate window (soft: the matcher only prefers unbarriered near-ties).
+    """
+    for lr in layout_regions:
+        if lr.label not in IMAGE_LABELS:
+            continue
+        fig = lr.bbox
+        if fig.y0 < effective_bbox.y1 + cfg.barrier_min_figure_gap_pt:
+            continue  # not a separate figure below ours
+        if fig.horizontal_overlap(candidate_bbox) < 0.3 * candidate_bbox.width:
+            continue  # different column than the candidate
+        if candidate_bbox.y0 >= fig.y0 - 1.0:
+            return True
+    return False
+
+
 def collect_candidates(
     image: ImageOccurrence,
     regions: Sequence[TextRegion],
@@ -208,6 +279,7 @@ def collect_candidates(
     *,
     bbox_override: BBox | None = None,
     page_scan: bool = False,
+    layout_regions: Sequence[LayoutRegion] = (),
 ) -> list[CaptionCandidate]:
     """All caption candidates on `image`'s page, nearest-first.
 
@@ -218,6 +290,11 @@ def collect_candidates(
     PP-DocLayout-S's figure region is the effective image bbox
     (`bbox_override`) and the figure-internal filter is disabled — every
     real text block of a scan sits "inside" the page raster.
+
+    DL authority (final plan §11): a figure_title-tagged block bypasses the
+    window/column checks within sanity bounds (`_layout_admission`) — the
+    layout model, not the tuned gap, decides that nearby caption-shaped text
+    belongs to this figure.
     """
     effective_bbox = bbox_override if bbox_override is not None else image.bbox
     if effective_bbox is None:
@@ -229,12 +306,22 @@ def collect_candidates(
             continue
         if not passes_base_filters(region, page_height, cfg):
             continue
-        if not page_scan and is_figure_internal(region.bbox, effective_bbox):
+        layout_tagged = region.layout_label in CAPTION_LABELS
+        if not page_scan and not layout_tagged and is_figure_internal(region.bbox, effective_bbox):
             continue
         position = _vertical_relation(effective_bbox, region.bbox, cfg)
-        if position is None:
-            continue
-        if not horizontally_related(effective_bbox, region.bbox, cfg):
+        if position is not None:
+            # In-window: the strict column rule decides ownership for everyone
+            # — the DL tag confirms caption-ness, geometry decides ownership.
+            if not horizontally_related(effective_bbox, region.bbox, cfg):
+                continue
+        elif layout_tagged:
+            # Out-of-window: DL admission — the model vouches that this
+            # caption region belongs to this figure, within sanity bounds.
+            position = _layout_admission(effective_bbox, region, cfg)
+            if position is None:
+                continue
+        else:
             continue
         candidates.append(
             CaptionCandidate(
@@ -315,9 +402,34 @@ def merge_split_captions(
                 bbox=BBox(x0=x0, y0=y0, x1=x1, y1=y1),
                 source=head.source,
                 page=head.page,
+                # DL evidence survives the §38 merge: the head block carries
+                # the PP-DocLayout-S figure_title tag (final plan §11).
+                layout_label=head.layout_label,
+                layout_confidence=head.layout_confidence,
             )
         )
     return merged
+
+
+def tag_layout_barriers(
+    image_bbox: BBox,
+    candidates: Sequence[CaptionCandidate],
+    layout_regions: Sequence[LayoutRegion],
+    cfg: CandidateConfig = CANDIDATE_CONFIG,
+) -> None:
+    """Flag below-candidates that start at/beyond the NEXT figure's region.
+
+    Mutates `candidate.features` in place (call after feature annotation).
+    The flag is soft authority: the matcher prefers an unbarriered candidate
+    when scores are close, but never overrides a clear winner.
+    """
+    for candidate in candidates:
+        if candidate.bbox.y0 < image_bbox.y1:
+            continue  # above/intersecting candidates have no barrier notion
+        if _beyond_layout_barrier(image_bbox, candidate.bbox, layout_regions, cfg):
+            if candidate.features is None:
+                candidate.features = {}
+            candidate.features["beyond_layout_barrier"] = 1.0
 
 
 def build_page_candidates(
@@ -335,6 +447,7 @@ def build_page_candidates(
             regions,
             page_height=page.page_height,
             cfg=cfg,
+            layout_regions=page.layout_regions,
         )
     return result
 

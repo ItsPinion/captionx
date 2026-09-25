@@ -18,9 +18,12 @@ source; fallback and passthrough matches → `fallback`; unresolved →
 
 from __future__ import annotations
 
+from typing import Sequence
+
 from src.models import (
     BBox,
     CaptionCandidate,
+    LayoutRegion,
     ImageOccurrence,
     MatchMethod,
     MatchResult,
@@ -34,6 +37,7 @@ from .candidates import (
     CandidateConfig,
     collect_candidates,
     merge_split_captions,
+    tag_layout_barriers,
 )
 from .confidence import (
     CONFIDENCE_CONFIG,
@@ -63,6 +67,42 @@ _METHOD_BY_SOURCE = {
 }
 
 
+def _arbitrate(ranked: list[CaptionCandidate]) -> list[CaptionCandidate]:
+    """DL winner arbitration (final plan §11) — soft, evidence-first.
+
+    Two rules, applied only near the top (never overrides a clear winner):
+    1. barrier: a candidate starting at/beyond the NEXT layout figure region
+       loses to an unbarriered candidate within 0.15 score — the DL figure
+       boundary bounds the window (§13.2 authority).
+    2. confirmation: when scores are within 0.05, a PP-DocLayout-S
+       figure_title-tagged candidate wins — the model confirms caption-ness.
+    """
+    if len(ranked) < 2:
+        return ranked
+    best = ranked[0]
+    best_barrier = (best.features or {}).get("beyond_layout_barrier") == 1.0
+    best_tagged = (best.features or {}).get("layout_caption") == 1.0
+
+    if best_barrier:
+        for other in ranked[1:]:
+            if (other.features or {}).get("beyond_layout_barrier") == 1.0:
+                continue
+            if other.score >= best.score - 0.15:
+                best, best_barrier, best_tagged = other, False, (
+                    (other.features or {}).get("layout_caption") == 1.0
+                )
+            break  # only the top non-barriered challenger can take over
+
+    if not best_tagged:
+        for other in ranked[1:]:
+            if other.score < best.score - 0.05:
+                break  # ranked is score-descending
+            if (other.features or {}).get("layout_caption") == 1.0:
+                best = other
+                break
+    return [best] + [c for c in ranked if c is not best]
+
+
 def _best_of(
     image: ImageOccurrence,
     regions,
@@ -74,6 +114,7 @@ def _best_of(
     *,
     bbox_override=None,
     page_scan: bool = False,
+    layout_regions: Sequence[LayoutRegion] = (),
 ):
     """One pass: candidates → features → scores → (best, confidence, accepted)."""
     candidates: list[CaptionCandidate] = collect_candidates(
@@ -85,8 +126,14 @@ def _best_of(
         page_scan=page_scan,
     )
     annotate_candidates(image, candidates, feature_cfg)
+    if layout_regions:
+        # DL figure boundaries bound the below-window (soft barriers).
+        effective = bbox_override if bbox_override is not None else image.bbox
+        if effective is not None:
+            tag_layout_barriers(effective, candidates, layout_regions, candidate_cfg)
     score_candidates(candidates, score_cfg)
     ranked = rank_candidates(candidates)
+    ranked = _arbitrate(ranked)
     return evaluate_top_candidate(ranked, confidence_cfg)
 
 
@@ -97,6 +144,7 @@ def match_image(
     *,
     bbox_override=None,
     page_scan: bool = False,
+    layout_regions: Sequence[LayoutRegion] = (),
 ):
     """Strict pass then fallback pass for one image → MatchResult."""
     best, confidence, accepted = _best_of(
@@ -109,6 +157,7 @@ def match_image(
         CONFIDENCE_CONFIG,
         bbox_override=bbox_override,
         page_scan=page_scan,
+        layout_regions=layout_regions,
     )
     if accepted and best is not None:
         return MatchResult(
@@ -129,6 +178,7 @@ def match_image(
         FALLBACK_CONFIDENCE_CONFIG,
         bbox_override=bbox_override,
         page_scan=page_scan,
+        layout_regions=layout_regions,
     )
     if accepted and best is not None:
         return MatchResult(
@@ -197,6 +247,7 @@ def match_document(document: DocumentExtraction) -> dict[str, MatchResult]:
                 page_height=page.page_height or 842.0,
                 bbox_override=bbox_override,
                 page_scan=page_scan,
+                layout_regions=page.layout_regions,
             )
 
     series_passthrough(figures, results)
