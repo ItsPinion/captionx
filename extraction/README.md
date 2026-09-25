@@ -16,6 +16,25 @@ Part of the CaptionX assessment project — see [../plan.md](../plan.md).
 | OCR text | ✅ PaddleOCR 3.7 PP-OCRv5 mobile models, CPU |
 | obtain bounding boxes | ✅ 87–94 boxes/page with conf 0.91–1.00 |
 
+**Phase 3 — internal data model ✅ (46 tests)**
+
+`src/models/schemas.py` defines the §9 structures — `Document`,
+`ImageOccurrence` (never deduplicated), `TextRegion` (`native_pdf`/`ocr`),
+`CaptionCandidate` (text + bbox + features + score), `MatchResult`
+(`matched`/`caption_not_found`) — plus a frozen `BBox` geometry primitive in
+PDF page points (top-left origin, y down) with the overlap/gap/alignment
+relations the caption-matching features (Phases 7–9) build on. Enum string
+values mirror the TypeScript `@captionx/shared` JSON contract; a contract test
+guards them.
+
+Run the tests:
+
+```bash
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/python -m pytest tests -q
+```
+
+
 ## Setup
 
 ```bash

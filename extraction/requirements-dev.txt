@@ -1,0 +1,4 @@
+# Development-only dependencies for the extraction engine (tests, tuning).
+# Runtime dependencies live in requirements.txt.
+-r requirements.txt
+pytest==9.1.1
