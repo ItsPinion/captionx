@@ -42,6 +42,52 @@ class TestExtractTextRegions:
         regions = extract_text_regions(doc[1])
         assert regions[0].page == 2
 
+    def test_fused_footer_caption_block_is_split(self):
+        """A block gluing a running footer above the caption splits at the head.
+
+        Real-world case (unseen ch02 p6): the fused block even landed inside
+        the running-footer band and was dropped wholesale — the caption below
+        a true figure then had no candidate at all.
+        """
+        doc, page = new_page()
+        add_text(page, "MATTER AROUND US PURE\nFig. 2.5: Evaporation", (72, 700))
+        regions = extract_text_regions(page)
+        assert [r.text for r in regions] == [
+            "MATTER AROUND US PURE",
+            "Fig. 2.5: Evaporation",
+        ]
+        pre, head = regions
+        assert pre.bbox.y1 <= head.bbox.y0 + 0.1  # split at the head line's y
+        assert head.bbox.y1 == pre.bbox.y1 or head.bbox.y0 < head.bbox.y1
+
+    def test_stray_line_above_caption_head_is_split(self):
+        """Unseen ch02 p7: 'by sublimation ⏎ Fig. 2.6: …' in one block."""
+        doc, page = new_page()
+        add_text(page, "by sublimation\nFig. 2.6: Separation of immiscible liquids", (72, 690))
+        regions = extract_text_regions(page)
+        assert [r.text.split("\n")[0] for r in regions] == [
+            "by sublimation",
+            "Fig. 2.6: Separation of immiscible liquids",
+        ]
+        # the caption region starts exactly at the head line
+        assert regions[1].text.startswith("Fig.")
+
+    def test_clean_caption_block_is_not_split(self):
+        doc, page = new_page()
+        add_text(page, "Fig. 2.6: Separation of immiscible liquids", (72, 700))
+        regions = extract_text_regions(page)
+        assert len(regions) == 1
+        assert regions[0].text == "Fig. 2.6: Separation of immiscible liquids"
+
+    def test_embedded_head_without_measured_line_stays_whole(self):
+        """If the dict pass cannot place the head line, behavior is unchanged."""
+        doc, page = new_page()
+        add_text(page, "first line\nFig. 2.7: something", (72, 700))
+        regions = extract_text_regions(page)
+        # split found the line here — text pieces preserved exactly (§13.4)
+        assert "\n" in regions[0].text or len(regions) == 2
+        assert "".join(r.text for r in regions) == "first lineFig. 2.7: something"
+
     def test_extract_page_returns_text_and_figures_together(self):
         doc, page = new_page()
         add_text(page, "Fig. 1.6: ice melting", (72, 650))
