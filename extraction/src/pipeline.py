@@ -21,7 +21,7 @@ import pymupdf
 from src.matching import match_document
 from src.models import DocumentSource, MatchResult
 from src.ocr.pipeline import apply_ocr_when_needed
-from src.pdf.extractor import DocumentExtraction, extract_document
+from src.pdf.extractor import DocumentExtraction, document_metadata, extract_page
 from src.output import write_results_csv, write_results_json
 
 __all__ = ["PipelineOutcome", "StageError", "run_pipeline"]
@@ -86,43 +86,57 @@ def run_pipeline(
     validate_input(pdf_path)
     images_dir.mkdir(parents=True, exist_ok=True)
 
+    # §41.5 streaming: the PDF is opened ONCE and processed page-by-page —
+    # each page's images are written to disk immediately and the pixel bytes
+    # are released, so peak memory is one page's worth of pixels, not the
+    # whole document's. (extract_document() still offers the accumulate-all
+    # contract for tests and tools.)
     report("pdf_parse", "opening document")
-    try:
-        extraction: DocumentExtraction = extract_document(
-            pdf_path,
-            document_id=document_id,
-            source=source,
-            filename=filename,
-        )
-    except Exception as exc:
-        raise StageError("pdf_parse", f"failed to parse {pdf_path.name}: {exc}") from exc
-
-    # Stage image_extraction happens inside extract_document per page; here we
-    # persist the extracted pixels.
-    report("image_extraction", f"writing {len(extraction.figures)} extracted image(s)")
-    try:
-        for figure in extraction.figures:
-            (images_dir / figure.occurrence.filename).write_bytes(figure.png)
-    except OSError as exc:
-        raise StageError("image_extraction", f"failed to write images: {exc}") from exc
-
-    # Stage ocr: merge OCR regions into pages whose native text is unusable
-    # (loads models lazily — usually a no-op on NCERT chapters).
-    report("ocr", "checking pages for OCR need")
-    ocr_pages = 0
+    doc = None
     try:
         doc = pymupdf.open(pdf_path)
-        try:
-            for page in extraction.pages:
-                if apply_ocr_when_needed(doc, page):
-                    ocr_pages += 1
-        finally:
-            doc.close()
+        document, stem = document_metadata(
+            doc, document_id, source, filename or pdf_path.name
+        )
+        extraction = DocumentExtraction(document=document)
     except StageError:
         raise
     except Exception as exc:
-        raise StageError("ocr", f"OCR stage failed: {exc}") from exc
-    report("ocr", f"ocr ran on {ocr_pages} page(s)")
+        raise StageError("pdf_parse", f"failed to parse {pdf_path.name}: {exc}") from exc
+
+    ocr_pages = 0
+    try:
+        report("image_extraction", f"extracting images from {doc.page_count} page(s)")
+        for page_no in range(1, doc.page_count + 1):
+            try:
+                page = extract_page(doc, page_no, stem)
+            except Exception as exc:
+                raise StageError(
+                    "image_extraction", f"failed to extract page {page_no}: {exc}"
+                ) from exc
+            try:
+                for figure in page.figures:
+                    (images_dir / figure.occurrence.filename).write_bytes(figure.png)
+                    figure.png = b""  # §41.5/§41.6: persisted → release pixels
+            except OSError as exc:
+                raise StageError(
+                    "image_extraction", f"failed to write images: {exc}"
+                ) from exc
+            # Stage ocr: merge OCR regions when the native text is unusable
+            # (loads models lazily — usually a no-op on NCERT chapters).
+            try:
+                if apply_ocr_when_needed(doc, page):
+                    ocr_pages += 1
+            except StageError:
+                raise
+            except Exception as exc:
+                raise StageError("ocr", f"OCR stage failed: {exc}") from exc
+            extraction.pages.append(page)
+        report("image_extraction", f"{doc.page_count} page(s) processed")
+        report("ocr", "checking pages for OCR need")
+        report("ocr", f"ocr ran on {ocr_pages} page(s)")
+    finally:
+        doc.close()
 
     report("matching", "scoring caption candidates")
     try:

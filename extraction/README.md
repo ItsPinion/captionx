@@ -247,6 +247,26 @@ honestly `caption_not_found` again, and ch01 Fig 1.5 upgraded to the strict
 pass. Pinned by `test_hertz_portrait_not_forced` (fixture) and
 `test_far_above_caption_never_lands_on_portrait` (unit).
 
+## Phase 35 — Performance ✅ (plan §41)
+
+Checklist, in the plan's order — with measured baselines
+(`scripts/benchmark.py`):
+
+| § | Item | Status |
+|---|---|---|
+| 41.1 | Avoid unnecessary OCR | per-page `needs_ocr` decision; all three chapters run with **0 OCR pages** — native text only |
+| 41.2 | Initialize OCR once | process-wide engine singleton + vendored models; **init measured 0.21 s**; never loaded when unneeded |
+| 41.3 | One PDF globally | §23 FIFO serial worker (already decided) |
+| 41.4 | No huge renders | OCR pages at 200 DPI; composite regions rendered **clip-only at 144 DPI** (zoom 2.0) — never a full page at high DPI |
+| 41.5 | Don't hold the PDF in memory | **streaming pipeline**: the document is opened once and processed page-by-page; each page's PNGs are written immediately and the pixel bytes released — peak memory is one page's slice (chapters total 138–563 KB of PNGs) |
+| 41.6 | Release temp page images | no temp files exist to delete: renders go straight to PNG bytes → disk; OCR works on in-memory numpy arrays; the doc handle is closed in `finally` |
+| 41.7 | Don't parallelize | strictly serial end-to-end: one worker, no pools (verified: no `concurrent.futures`/`multiprocessing` anywhere in `src/`) |
+
+Baselines (this machine, native-text path): ch01 0.45 s · ch05 1.67 s
+(composite-heavy) · ch12 0.33 s — **2.45 s for all three chapters**,
+dominated by clip-rendering of composite regions. OCR, when a page needs
+it, adds the engine init (0.21 s) plus ~per-page inference.
+
 ## Known characteristics of the target NCERT PDFs
 
 - Rich **native** text layer (~200 text blocks/chapter with coordinates) —

@@ -86,7 +86,9 @@ export function allJobs(): StoredJob[] {
   const jobs: StoredJob[] = [];
   for (const entry of entries) {
     const job = loadJob(entry);
-    if (job) jobs.push(job);
+    // A corrupt or hand-mangled record (no createdAt) must not take down
+    // the whole queue view (§30) — skip it instead of crashing the sort.
+    if (job && typeof job.createdAt === "string") jobs.push(job);
   }
   // FIFO order key (plan.md §23): oldest first.
   jobs.sort((a, b) => a.createdAt.localeCompare(b.createdAt));

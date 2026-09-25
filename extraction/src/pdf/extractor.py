@@ -25,7 +25,14 @@ from .images import (
 )
 from .text import extract_text_regions
 
-__all__ = ["ExtractedFigure", "DocumentExtraction", "PageExtraction", "extract_document", "extract_page"]
+__all__ = [
+    "ExtractedFigure",
+    "DocumentExtraction",
+    "PageExtraction",
+    "document_metadata",
+    "extract_document",
+    "extract_page",
+]
 
 
 def sanitize_stem(filename: str) -> str:
@@ -143,6 +150,31 @@ def extract_page(doc: pymupdf.Document, page_no_1based: int, document_stem: str)
     )
 
 
+def document_metadata(
+    doc: pymupdf.Document,
+    document_id: str,
+    source: DocumentSource | str = DocumentSource.UPLOAD,
+    filename: Optional[str] = None,
+) -> tuple[Document, str]:
+    """Build the `Document` record + sanitized stem from an open document.
+
+    `filename` must already be resolved by the caller (display name, falling
+    back to the PDF's own name). Shared by `extract_document` and the
+    streaming pipeline (plan §41.5): the caller owns the handle and pages
+    through with `extract_page`.
+    """
+    resolved = filename or "document.pdf"
+    return (
+        Document(
+            document_id=document_id,
+            filename=resolved,
+            page_count=doc.page_count,
+            source=source,
+        ),
+        sanitize_stem(resolved),
+    )
+
+
 def extract_document(
     pdf_path: str | Path,
     document_id: str,
@@ -152,12 +184,8 @@ def extract_document(
     """Extract all pages of `pdf_path` into structured per-page content."""
     doc = pymupdf.open(pdf_path)
     try:
-        stem = sanitize_stem(filename or Path(pdf_path).name)
-        document = Document(
-            document_id=document_id,
-            filename=filename or Path(pdf_path).name,
-            page_count=doc.page_count,
-            source=source,
+        document, stem = document_metadata(
+            doc, document_id, source, filename or Path(pdf_path).name
         )
         extraction = DocumentExtraction(document=document)
         for page_no in range(1, doc.page_count + 1):

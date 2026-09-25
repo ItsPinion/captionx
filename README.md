@@ -127,6 +127,29 @@ All 12 §40 cases deliberately inspected and pinned — matrix with evidence in
 path was re-run for the checklist (Case 10). Proximity feature window aligned
 with the §33-corrected candidate windows.
 
+**Phase 35 — Performance** ✅
+
+Streaming pipeline (open once, page-by-page, pixels released as written),
+single-init OCR, measured baselines: **2.45 s for all three chapters**
+native-text; checklist in [extraction/README.md](./extraction/README.md),
+harness: `extraction/scripts/benchmark.py`.
+
+**Phase 36 — Cleanup & storage rules** ✅
+
+Storage policy (§36), enforced + documented:
+
+- **Uploads** (`data/uploads/`): original PDFs are kept for debugging
+  throughout the assessment.
+- **Jobs** (`data/jobs/<id>/`): `job.json` + engine `status.json` — full
+  processing state per job.
+- **Results** (`data/results/<id>/`): completed result directories are kept
+  (results.json / results.csv / images/).
+- **Temporary files**: the engine writes none (§41.5/§41.6 — in-memory
+  renders, OCR on numpy arrays, vendored model cache so nothing accumulates
+  in `$HOME`). The only litter possible is atomic-write `*.tmp` leftovers
+  after a crash — swept automatically at API boot (`cleanupStrayTmpFiles`),
+  real state never touched.
+
 ## Testing & CI
 
 All suites run locally the same way CI runs them (`.github/workflows/ci.yml`,
