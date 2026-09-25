@@ -91,6 +91,23 @@ Jobs live in `data/jobs/<id>/job.json`; engine output in
 `CAPTIONX_UPLOADS_DIR`, `CAPTIONX_JOBS_DIR`, `CAPTIONX_RESULTS_DIR`,
 `CAPTIONX_PYTHON_BIN`, `CAPTIONX_MAIN_SCRIPT`, `API_PORT`.
 
+## Testing & CI
+
+All suites run locally the same way CI runs them (`.github/workflows/ci.yml`,
+badge above — three jobs on every push/PR):
+
+| Suite | Phases | Command |
+|---|---|---|
+| Typecheck (all workspaces) | 1–29 | `bun run typecheck` |
+| API tests — store, FIFO worker, §24 recovery, routes, stub engine | 17–21 | `bun test apps/api` |
+| Dashboard tests — queue rendering, tabs, selection, ZIP builder, URL building | 22–29 | `cd apps/web && bun test` |
+| Lint + production build | 21–29 | `bun run lint && bun run build` |
+| Extraction battery (238 tests) | 2–16 | `cd extraction && .venv/bin/python -m pytest tests -q` |
+| §47 CLI milestone + chapter pins | 12–16 | see [extraction/README.md](./extraction/README.md) |
+
+CI also fetches the pinned-edition NCERT fixtures and runs a §47 CLI smoke on
+ch05 asserting the exact 8 images / 6 matched / 2 `caption_not_found` pin.
+
 ## Structure
 
 ```text

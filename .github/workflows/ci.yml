@@ -1,6 +1,7 @@
-# CaptionX CI — runs the full Phase 1–20 test battery on every push/PR.
+# CaptionX CI — runs the full Phase 1–29 test battery on every push/PR.
 #
 #   api        — Bun workspace: monorepo typecheck + API test suite (stub engine)
+#   web        — dashboard: component/unit tests (happy-dom), lint, Next.js build
 #   extraction — Python 3.11: pinned engine battery + NCERT fixture pins + §47 CLI smoke
 #
 # The extraction install mirrors extraction/setup.sh exactly (pinned stack +
@@ -36,6 +37,29 @@ jobs:
 
       - name: API tests (store, worker, routes)
         run: bun test apps/api
+
+  web:
+    name: Dashboard tests + build (Bun)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install workspace dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Dashboard component + unit tests (§23–§29, happy-dom)
+        working-directory: apps/web
+        run: bun test
+
+      - name: Lint (all workspaces)
+        run: bun run lint
+
+      - name: Production build (Next.js)
+        run: bun run build
 
   extraction:
     name: Extraction tests (Python 3.11)

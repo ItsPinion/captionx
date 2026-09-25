@@ -1,0 +1,3 @@
+# Web app tests run with Bun's test runner + happy-dom:
+#   cd apps/web && bun test
+# happy-dom is registered explicitly in tests/dashboard.test.tsx.
