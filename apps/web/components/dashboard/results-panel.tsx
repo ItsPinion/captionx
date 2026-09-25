@@ -217,6 +217,19 @@ function ResultTable({ jobId, images }: { jobId: string; images: ImageResult[] }
         </span>
       </p>
 
+      {images.length === 0 && (
+        <EmptyState
+          text={
+            "No embedded raster images were found in this PDF. Figures drawn " +
+            "as vector graphics (lines/curves in the page content — typical " +
+            "of the current ncert.nic.in Maths editions) have no raster " +
+            "object to extract, so a completed job with 0 images is the " +
+            "correct, in-scope outcome. Probe any PDF with " +
+            "extraction/scripts/pdf_census.py."
+          }
+        />
+      )}
+
       <div className="rounded-md border">
         <Table>
           <TableHeader>

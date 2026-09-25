@@ -33,6 +33,30 @@ export function ensureDataDirs(): void {
   }
 }
 
+/**
+ * Clear all runtime state (uploads, job dirs, results) — the "fresh start"
+ * the dashboard's boot flow offers. `.gitkeep` placeholders are preserved
+ * so the empty tree stays in Git. Runs only when explicitly invoked:
+ * the API wires it to `CAPTIONX_RESET_DATA=1` at boot (the default `bun
+ * run dev` sets it; `bun run dev:keep` preserves state for the §24
+ * restart-recovery demo).
+ *
+ * Returns how many entries were removed.
+ */
+export function resetDataDirs(): number {
+  const { readdirSync, rmSync } = require("node:fs") as typeof import("node:fs");
+  ensureDataDirs();
+  let removed = 0;
+  for (const dir of [config.uploadsDir, config.jobsDir, config.resultsDir]) {
+    for (const entry of readdirSync(dir)) {
+      if (entry === ".gitkeep") continue;
+      rmSync(join(dir, entry), { recursive: true, force: true });
+      removed += 1;
+    }
+  }
+  return removed;
+}
+
 export const paths = {
   jobDir: (jobId: string) => join(config.jobsDir, jobId),
   jobFile: (jobId: string) => join(config.jobsDir, jobId, "job.json"),

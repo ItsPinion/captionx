@@ -100,11 +100,12 @@ export function useSubmitUploads() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (files: File[]): Promise<UploadOutcome> => {
-      const form = new FormData();
-      for (const file of files) {
-        form.append("files", file, file.name);
-      }
-      const res = await apiClient.jobs.upload.$post({ form });
+      // NOTE: `{ form }` must be a PLAIN OBJECT, not a FormData instance —
+      // hono's RPC client rebuilds the multipart body from
+      // `Object.entries(args.form)`, and a FormData instance has no
+      // enumerable entries, so the upload would arrive EMPTY ("no files
+      // uploaded"). Passing `{ files }` lets the client append each File.
+      const res = await apiClient.jobs.upload.$post({ form: { files } });
       const body = (await res.json()) as UploadOutcome | { error: string };
       if (!res.ok) {
         throw new Error(

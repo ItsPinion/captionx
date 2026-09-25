@@ -126,7 +126,11 @@ Ubuntu LTS, brew, pyenv). OCR models are already vendored under
 ## 6. Running the system
 
 ```bash
-bun run dev         # API on http://localhost:4000 + dashboard on http://localhost:3000
+bun run dev         # fresh start: clears data/ (uploads, jobs, results), then
+                    # API on http://localhost:4000 + dashboard on http://localhost:3000
+bun run dev:keep    # same, but PRESERVES data/ across restarts (needed for the
+                    # §24 restart-recovery demo)
+bun run reset       # one-off data/ clear without starting anything
 ```
 
 1. Open **http://localhost:3000** — the header shows a live API health check.

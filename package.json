@@ -8,12 +8,14 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "turbo dev",
+    "dev": "CAPTIONX_RESET_DATA=1 turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "dev:web": "cd apps/web && bun run dev",
-    "dev:api": "cd apps/api && bun run dev"
+    "dev:api": "cd apps/api && bun run dev",
+    "dev:keep": "turbo dev",
+    "reset": "bun apps/api/scripts/reset-data.ts"
   },
   "devDependencies": {
     "turbo": "^2.11.3"

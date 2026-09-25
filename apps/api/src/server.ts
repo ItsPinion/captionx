@@ -1,12 +1,18 @@
 import app from "./index";
 import { worker } from "./jobs/worker";
-import { ensureDataDirs } from "./config";
+import { ensureDataDirs, resetDataDirs } from "./config";
 import { cleanupStrayTmpFiles } from "./services/cleanup";
 import { API_PORT } from "@captionx/shared";
 
 const port = Number(process.env.API_PORT ?? API_PORT);
 
 // Filesystem state + FIFO worker with §24 restart recovery.
+// CAPTIONX_RESET_DATA=1 (the default `bun run dev`) starts from a clean
+// slate; `bun run dev:keep` preserves uploads/jobs/results across restarts.
+if (process.env.CAPTIONX_RESET_DATA === "1") {
+  const cleared = resetDataDirs();
+  console.log(`[captionx-api] reset data/ — removed ${cleared} entr(y|ies)`);
+}
 ensureDataDirs();
 const swept = cleanupStrayTmpFiles(); // §36: crash-leftover atomic-write temps
 if (swept > 0) {

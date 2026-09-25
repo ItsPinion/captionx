@@ -21,11 +21,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { urlFailureMessage } from "@/lib/errors";
 import { useSubmitUploads, useSubmitUrls } from "@/lib/hooks";
+import { OFFICIAL_INDEX, SAMPLE_CHAPTERS } from "@/lib/sample-chapters";
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -48,7 +50,7 @@ export function InputPanel() {
           PDF is processed at a time.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="gap-4">
         <Tabs defaultValue="files">
           <TabsList className="w-full sm:w-fit">
             <TabsTrigger value="files" className="flex-1 sm:px-6">
@@ -65,8 +67,126 @@ export function InputPanel() {
             <UrlsMode />
           </TabsContent>
         </Tabs>
+        <SamplePdfs />
       </CardContent>
     </Card>
+  );
+}
+
+/** Sample chapters, downloadable straight from the source (plan §1 targets). */
+/**
+ * Quick-download menu (front page): ALL pinned Class 9 Science chapters,
+ * selectable — tick one or many and "Extract selected" submits each pinned
+ * URL through the §19 URL flow (server-side download → FIFO jobs). Every
+ * row also links the pinned edition and the official ncert.nic.in PDF.
+ * The catalog lives in lib/sample-chapters.ts (pinned + official mappings).
+ */
+function SamplePdfs() {
+  const submitUrls = useSubmitUrls();
+  const [selected, setSelected] = useState<ReadonlySet<number>>(new Set());
+
+  const allSelected = selected.size === SAMPLE_CHAPTERS.length;
+  const toggle = (n: number, on: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(n);
+      else next.delete(n);
+      return next;
+    });
+  };
+
+  const extractSelected = () => {
+    if (selected.size === 0 || submitUrls.isPending) return;
+    const urls = SAMPLE_CHAPTERS
+      .filter((c) => selected.has(c.chapter))
+      .map((c) => c.pinned);
+    submitUrls.mutate(urls, { onSuccess: () => setSelected(new Set()) });
+  };
+
+  return (
+    <div
+      data-testid="sample-pdfs"
+      className="rounded-md border bg-muted/30 px-3 py-3 text-sm"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-medium">
+          No PDF at hand? Pick any Class 9 Science chapter
+        </p>
+        <label className="text-muted-foreground flex items-center gap-1.5 text-xs">
+          <Checkbox
+            aria-label="Select all sample chapters"
+            checked={allSelected || (selected.size > 0 && "indeterminate")}
+            onCheckedChange={(on) =>
+              setSelected(
+                on === true
+                  ? new Set(SAMPLE_CHAPTERS.map((c) => c.chapter))
+                  : new Set(),
+              )
+            }
+          />
+          select all
+        </label>
+      </div>
+
+      <div className="mt-2 max-h-60 overflow-y-auto pr-1">
+        <div className="flex flex-col gap-1">
+          {SAMPLE_CHAPTERS.map((chapter) => (
+            <div
+              key={chapter.chapter}
+              className="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-muted/50"
+            >
+              <Checkbox
+                aria-label={`Select chapter ${chapter.chapter}`}
+                checked={selected.has(chapter.chapter)}
+                onCheckedChange={(on) => toggle(chapter.chapter, on === true)}
+              />
+              <span className="w-6 shrink-0 text-right tabular-nums text-muted-foreground">
+                {chapter.chapter}
+              </span>
+              <span className="min-w-0 flex-1 truncate">{chapter.title}</span>
+              <a
+                className="shrink-0 underline underline-offset-2 hover:no-underline"
+                aria-label={`Download chapter ${chapter.chapter}, pinned edition`}
+                href={chapter.pinned}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                pinned
+              </a>
+              <a
+                className="text-muted-foreground shrink-0 underline underline-offset-2 hover:no-underline"
+                aria-label={`Open chapter ${chapter.chapter} on the official site`}
+                href={chapter.official ?? OFFICIAL_INDEX}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                official
+              </a>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={selected.size === 0 || submitUrls.isPending}
+          onClick={extractSelected}
+        >
+          {submitUrls.isPending ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Upload className="size-4" />
+          )}
+          Extract selected ({selected.size})
+        </Button>
+        <p className="text-muted-foreground text-xs">
+          pinned edition = the one the demo numbers are verified for; the
+          official ncert.nic.in revision redraws some figures as vector art.
+        </p>
+      </div>
+    </div>
   );
 }
 

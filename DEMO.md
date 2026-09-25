@@ -30,6 +30,17 @@ the alternate input mode — not part of this demo.)
 
 ## Step 3 — Upload the two chosen NCERT chapter PDFs
 
+The dashboard's **Add PDFs** card has a **selection menu of all 15 Class 9
+Science chapters** (pinned edition) — tick one or many and hit *Extract
+selected*, or use the per-row *pinned* / *official* download links. Official
+chapter URLs (current ncert.nic.in edition — note its numbering differs from
+the pinned edition: Sound is `jesc111` there, and 3 old chapters were
+dropped):
+
+- ch05 The Fundamental Unit of Life: https://ncert.nic.in/textbook/pdf/jesc105.pdf
+- Sound (pinned ch12 → official ch11): https://ncert.nic.in/textbook/pdf/jesc111.pdf
+- all chapters: https://ncert.nic.in/textbook.php?jesc1=0-13
+
 Drag & drop — or pick — **both** chapter PDFs together:
 
 - `extraction/fixtures/ncert_class9_science_ch05_cell.pdf`

@@ -157,3 +157,66 @@ describe("shared package (§22)", () => {
     expect(APP_NAME).toBe("Image–Caption Extraction");
   });
 });
+
+describe("sample-chapter selection menu (front page)", () => {
+  test("lists all 15 chapters with pinned + official links", () => {
+    const { getByTestId } = renderWithClient(<InputPanel />);
+    const block = getByTestId("sample-pdfs");
+    const links = [...block.querySelectorAll("a")];
+    const hrefs = links.map((a) => a.getAttribute("href"));
+
+    // all 15 pinned mirror PDFs are offered
+    const pinned = hrefs.filter((h) => h!.includes("raw.githubusercontent.com"));
+    expect(pinned).toHaveLength(15);
+    expect(
+      pinned.every((h) => /ScienceNcertChapterIX\d+\.pdf$/.test(h!)),
+    ).toBe(true);
+
+    // official links follow CURRENT-edition numbering: Sound (pinned ch12)
+    // is jesc111 there, and the 3 dropped chapters fall back to the index
+    expect(hrefs).toContain("https://ncert.nic.in/textbook/pdf/jesc105.pdf");
+    expect(hrefs).toContain("https://ncert.nic.in/textbook/pdf/jesc111.pdf");
+    expect(hrefs).toContain("https://ncert.nic.in/textbook/pdf/jesc112.pdf"); // ch15
+    const indexLinks = hrefs.filter((h) =>
+      h!.startsWith("https://ncert.nic.in/textbook.php"),
+    );
+    expect(indexLinks).toHaveLength(3);
+
+    for (const a of links) {
+      expect(a.getAttribute("target")).toBe("_blank");
+      expect(a.getAttribute("rel")).toBe("noopener noreferrer");
+    }
+  });
+
+  test("extract button starts disabled, enables via checkboxes, select-all works", () => {
+    const { getByTestId } = renderWithClient(<InputPanel />);
+    const block = getByTestId("sample-pdfs");
+
+    const extractButton = () =>
+      [...block.querySelectorAll("button")].find((b) =>
+        b.textContent?.includes("Extract selected"),
+      )!;
+    expect(extractButton().hasAttribute("disabled")).toBe(true);
+
+    // Radix Checkbox renders as button[role="checkbox"], not <input>.
+    const checkboxes = () =>
+      [
+        ...block.querySelectorAll('button[role="checkbox"]'),
+      ] as unknown as HTMLButtonElement[];
+    // 15 chapter checkboxes + 1 select-all
+    expect(checkboxes()).toHaveLength(16);
+
+    // tick one chapter → button enabled, count 1
+    fireEvent.click(checkboxes()[1]);
+    expect(extractButton().hasAttribute("disabled")).toBe(false);
+    expect(extractButton().textContent).toContain("(1)");
+
+    // select-all ticks everything (button label shows 15)
+    fireEvent.click(checkboxes()[0]);
+    expect(extractButton().textContent).toContain("(15)");
+
+    // select-all again clears (back to disabled)
+    fireEvent.click(checkboxes()[0]);
+    expect(extractButton().hasAttribute("disabled")).toBe(true);
+  });
+});
